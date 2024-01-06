@@ -41,7 +41,7 @@ type serviceNode struct {
 	name     string
 	disabled bool
 	modified bool
-	weight   *int64
+	weight   *int64 // Optional weight field
 }
 
 // Service represents the mapping from a discovery service into a configuration backend.
@@ -211,23 +211,31 @@ func (s *Service) markRemovedNodes(servers []ServiceServer) {
 
 func (s *Service) handleNode(server ServiceServer) error {
 	// Existing logic to check if server exists...
-	for _, sNode := range s.nodes {
-		if s.nodesMatch(sNode, server) {
-			sNode.modified = true
-			sNode.disabled = false
-			sNode.address = server.Address
-			sNode.port = int64(server.Port)
-
-			if server.Weight != nil { // Check if Weight is set
-				sNode.weight = server.Weight
-			} else {
-				defaultWeight := int64(128)
-				sNode.weight = &defaultWeight // Set to default if not provided
-			}
-			break
-		}
+	if s.serverExists(server) {
+		return nil
 	}
-	return nil
+	return s.setServer(server)
+
+	/*
+		// If we want to update an existing server, but we shouldn't need this in our environment
+		for _, sNode := range s.nodes {
+			if s.nodesMatch(sNode, server) {
+				sNode.modified = true
+				sNode.disabled = false
+				sNode.address = server.Address
+				sNode.port = int64(server.Port)
+
+				if server.Weight != nil { // Check if Weight is set
+					sNode.weight = server.Weight
+				} else {
+					defaultWeight := int64(128)
+					sNode.weight = &defaultWeight // Set to default if not provided
+				}
+				break
+			}
+		}
+		return nil
+	*/
 }
 
 func (s *Service) createNewNodes(nodeCount int) error {
@@ -315,6 +323,7 @@ func (s *Service) loadNodes() (bool, error) {
 			name:     server.Name,
 			address:  server.Address,
 			port:     *server.Port,
+			weight:   server.Weight,
 			modified: false,
 		}
 		if server.Maintenance == "enabled" {
@@ -388,6 +397,7 @@ func (s *Service) setServer(server ServiceServer) error {
 			sNode.disabled = false
 			sNode.address = server.Address
 			sNode.port = int64(server.Port)
+			sNode.weight = server.Weight
 			break
 		}
 	}
@@ -396,12 +406,14 @@ func (s *Service) setServer(server ServiceServer) error {
 
 func (s *Service) addNode() error {
 	name := s.getNodeName()
+	defaultWeight := int64(128) // Default weight for new nodes
+
 	server := &models.Server{
 		Name:    name,
 		Address: "127.0.0.1",
 		Port:    misc.Int64P(80),
 		ServerParams: models.ServerParams{
-			Weight:      misc.Int64P(128),
+			Weight:      misc.Int64P(defaultWeight),
 			Maintenance: "enabled",
 		},
 	}
@@ -415,6 +427,7 @@ func (s *Service) addNode() error {
 		port:     80,
 		modified: false,
 		disabled: true,
+		weight:   &defaultWeight,
 	})
 	return nil
 }
