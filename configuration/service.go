@@ -32,6 +32,7 @@ const ServiceGrowthTypeExponential = "exponential"
 type ServiceServer struct {
 	Address string
 	Port    int
+	Weight  *int64 // Optional weight field
 }
 
 type serviceNode struct {
@@ -40,6 +41,7 @@ type serviceNode struct {
 	name     string
 	disabled bool
 	modified bool
+	weight   *int64
 }
 
 // Service represents the mapping from a discovery service into a configuration backend.
@@ -208,10 +210,24 @@ func (s *Service) markRemovedNodes(servers []ServiceServer) {
 }
 
 func (s *Service) handleNode(server ServiceServer) error {
-	if s.serverExists(server) {
-		return nil
+	// Existing logic to check if server exists...
+	for _, sNode := range s.nodes {
+		if s.nodesMatch(sNode, server) {
+			sNode.modified = true
+			sNode.disabled = false
+			sNode.address = server.Address
+			sNode.port = int64(server.Port)
+
+			if server.Weight != nil { // Check if Weight is set
+				sNode.weight = server.Weight
+			} else {
+				defaultWeight := int64(128)
+				sNode.weight = &defaultWeight // Set to default if not provided
+			}
+			break
+		}
 	}
-	return s.setServer(server)
+	return nil
 }
 
 func (s *Service) createNewNodes(nodeCount int) error {
@@ -316,12 +332,16 @@ func (s *Service) updateConfig() (bool, error) {
 	reload := false
 	for _, node := range s.nodes {
 		if node.modified {
+			weight := int64(128) // Default weight
+			if node.weight != nil {
+				weight = *node.weight // Use the node's weight if set
+			}
 			server := &models.Server{
 				Name:    node.name,
 				Address: node.address,
 				Port:    misc.Ptr(node.port),
 				ServerParams: models.ServerParams{
-					Weight: misc.Int64P(128),
+					Weight: misc.Int64P(weight), // weight is already int64, no need to cast
 					Check:  "enabled",
 				},
 			}

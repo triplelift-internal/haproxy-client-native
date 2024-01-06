@@ -239,15 +239,36 @@ func (s *ServiceUpdateSuit) AfterTest(suiteName, testName string) {
 
 func (s *ServiceUpdateSuit) TestFirstUpdate() {
 	servers := []ServiceServer{
-		{Address: "127.1.1.1", Port: 81},
+		{Address: "127.1.1.1", Port: 81, Weight: misc.Int64P(100)},
 		{Address: "127.1.1.2", Port: 82},
-		{Address: "127.1.1.3", Port: 83},
+		{Address: "127.1.1.3", Port: 83, Weight: misc.Int64P(150)},
 		{Address: "127.1.1.4", Port: 84},
 	}
 	r, err := s.service.Update(servers)
 	s.True(r)
 	s.Nil(err)
 	s.validateUpdateResult(servers)
+}
+
+func (s *ServiceUpdateSuit) TestWeightSetting() {
+	servers := []ServiceServer{
+		{Address: "127.1.1.1", Port: 81, Weight: misc.Int64P(100)},
+		{Address: "127.1.1.2", Port: 82}, // Weight not set, should default
+	}
+	r, err := s.service.Update(servers)
+	s.True(r)
+	s.Nil(err)
+	updatedServers, err := s.service.GetServers()
+	s.Nil(err)
+	for i, server := range updatedServers {
+		s.Equal(servers[i].Address, server.Address)
+		s.Equal(servers[i].Port, int(*server.Port))
+		if servers[i].Weight != nil {
+			s.Equal(*servers[i].Weight, *server.Weight)
+		} else {
+			s.Equal(int64(128), *server.Weight) // Check for default weight
+		}
+	}
 }
 
 func (s *ServiceUpdateSuit) validateUpdateResult(expected []ServiceServer) {
