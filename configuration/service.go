@@ -350,7 +350,7 @@ func (s *Service) updateConfig() (bool, error) {
 				Address: node.address,
 				Port:    misc.Ptr(node.port),
 				ServerParams: models.ServerParams{
-					Weight: misc.Int64P(weight), // weight is already int64, no need to cast
+					Weight: misc.Int64P(int(weight)),
 					Check:  "enabled",
 				},
 			}
@@ -406,14 +406,13 @@ func (s *Service) setServer(server ServiceServer) error {
 
 func (s *Service) addNode() error {
 	name := s.getNodeName()
-	defaultWeight := int64(128) // Default weight for new nodes
 
 	server := &models.Server{
 		Name:    name,
 		Address: "127.0.0.1",
 		Port:    misc.Int64P(80),
 		ServerParams: models.ServerParams{
-			Weight:      misc.Int64P(defaultWeight),
+			Weight:      misc.Int64P(128),
 			Maintenance: "enabled",
 		},
 	}
@@ -427,7 +426,7 @@ func (s *Service) addNode() error {
 		port:     80,
 		modified: false,
 		disabled: true,
-		weight:   &defaultWeight,
+		weight:   misc.Int64P(128),
 	})
 	return nil
 }
