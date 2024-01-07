@@ -428,9 +428,9 @@ func (s *Service) addNode() error {
 		name:     name,
 		address:  "127.0.0.1",
 		port:     80,
+		weight:   &weight,
 		modified: false,
 		disabled: true,
-		weight:   &weight,
 	})
 	return nil
 }
