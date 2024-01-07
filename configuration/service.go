@@ -205,6 +205,7 @@ func (s *Service) markRemovedNodes(servers []ServiceServer) {
 			node.disabled = true
 			node.address = "127.0.0.1"
 			node.port = 80
+			node.weight = misc.Int64P(128)
 		}
 	}
 }
@@ -377,7 +378,7 @@ func (s *Service) nodeRemoved(node *serviceNode, servers []ServiceServer) bool {
 }
 
 func (s *Service) nodesMatch(sNode *serviceNode, servers ServiceServer) bool {
-	return !sNode.disabled && sNode.address == servers.Address && sNode.port == int64(servers.Port)
+	return !sNode.disabled && sNode.address == servers.Address && sNode.port == int64(servers.Port) && sNode.weight == servers.Weight
 }
 
 func (s *Service) serverExists(server ServiceServer) bool {
