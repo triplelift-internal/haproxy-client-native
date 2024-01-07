@@ -214,28 +214,25 @@ func (s *Service) handleNode(server ServiceServer) error {
 	if s.serverExists(server) {
 		return nil
 	}
-	return s.setServer(server)
+	//return s.setServer(server)
+	// If we want to update an existing server, but we shouldn't need this in our environment
+	for _, sNode := range s.nodes {
+		if s.nodesMatch(sNode, server) {
+			sNode.modified = true
+			sNode.disabled = false
+			sNode.address = server.Address
+			sNode.port = int64(server.Port)
 
-	/*
-		// If we want to update an existing server, but we shouldn't need this in our environment
-		for _, sNode := range s.nodes {
-			if s.nodesMatch(sNode, server) {
-				sNode.modified = true
-				sNode.disabled = false
-				sNode.address = server.Address
-				sNode.port = int64(server.Port)
-
-				if server.Weight != nil { // Check if Weight is set
-					sNode.weight = server.Weight
-				} else {
-					defaultWeight := int64(128)
-					sNode.weight = &defaultWeight // Set to default if not provided
-				}
-				break
+			if server.Weight != nil { // Check if Weight is set
+				sNode.weight = server.Weight
+			} else {
+				defaultWeight := int64(128)
+				sNode.weight = &defaultWeight // Set to default if not provided
 			}
+			break
 		}
-		return nil
-	*/
+	}
+	return nil
 }
 
 func (s *Service) createNewNodes(nodeCount int) error {
@@ -407,12 +404,16 @@ func (s *Service) setServer(server ServiceServer) error {
 func (s *Service) addNode() error {
 	name := s.getNodeName()
 
+	// Create a temporary ServiceServer instance to use getNodeWeight method
+	newServer := ServiceServer{}
+	weight := newServer.getNodeWeight()
+
 	server := &models.Server{
 		Name:    name,
 		Address: "127.0.0.1",
 		Port:    misc.Int64P(80),
 		ServerParams: models.ServerParams{
-			Weight:      misc.Int64P(128),
+			Weight:      misc.Int64P(int(weight)),
 			Maintenance: "enabled",
 		},
 	}
@@ -426,7 +427,7 @@ func (s *Service) addNode() error {
 		port:     80,
 		modified: false,
 		disabled: true,
-		weight:   misc.Int64P(128),
+		weight:   &weight,
 	})
 	return nil
 }
@@ -438,6 +439,15 @@ func (s *Service) getNodeName() string {
 	}
 	s.usedNames[name] = struct{}{}
 	return name
+}
+
+func (s *ServiceServer) getNodeWeight() int64 {
+	defaultWeight := int64(128) // Default weight
+
+	if s != nil && s.Weight != nil {
+		return *s.Weight // Use provided weight
+	}
+	return defaultWeight // Use default weight if not provided
 }
 
 func (s *Service) reorderNodes(count int) {
@@ -455,10 +465,12 @@ func (s *Service) swapDisabledNode(index int) {
 			s.nodes[i].modified = true
 			s.nodes[index].address = s.nodes[i].address
 			s.nodes[index].port = s.nodes[i].port
+			s.nodes[index].weight = s.nodes[i].weight
 			s.nodes[index].disabled = false
 			s.nodes[index].modified = true
 			s.nodes[i].address = "127.0.0.1"
 			s.nodes[i].port = 80
+			s.nodes[i].weight = misc.Int64P(128)
 			break
 		}
 	}
