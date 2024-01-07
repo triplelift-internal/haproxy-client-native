@@ -214,25 +214,27 @@ func (s *Service) handleNode(server ServiceServer) error {
 	if s.serverExists(server) {
 		return nil
 	}
-	//return s.setServer(server)
-	// If we want to update an existing server, but we shouldn't need this in our environment
-	for _, sNode := range s.nodes {
-		if s.nodesMatch(sNode, server) {
-			sNode.modified = true
-			sNode.disabled = false
-			sNode.address = server.Address
-			sNode.port = int64(server.Port)
+	return s.setServer(server)
+	/*
+		// If we want to update an existing server, but we shouldn't need this in our environment
+		for _, sNode := range s.nodes {
+			if s.nodesMatch(sNode, server) {
+				sNode.modified = true
+				sNode.disabled = false
+				sNode.address = server.Address
+				sNode.port = int64(server.Port)
 
-			if server.Weight != nil { // Check if Weight is set
-				sNode.weight = server.Weight
-			} else {
-				defaultWeight := int64(128)
-				sNode.weight = &defaultWeight // Set to default if not provided
+				if server.Weight != nil { // Check if Weight is set
+					sNode.weight = server.Weight
+				} else {
+					defaultWeight := int64(128)
+					sNode.weight = &defaultWeight // Set to default if not provided
+				}
+				break
 			}
-			break
 		}
-	}
-	return nil
+		return nil
+	*/
 }
 
 func (s *Service) createNewNodes(nodeCount int) error {
