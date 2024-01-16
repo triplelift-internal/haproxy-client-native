@@ -17,6 +17,7 @@ package configuration
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/haproxytech/client-native/v5/misc"
 	"github.com/haproxytech/client-native/v5/models"
@@ -129,32 +130,38 @@ func (s *Service) UpdateScalingParams(scaling ScalingParams) error {
 	return nil
 }
 
-// Update updates the backend associated with the server based on the list of servers provided
+// Update updates the backend associated with the server based on the list of servers provided.
 func (s *Service) Update(servers []ServiceServer) (bool, error) {
+	log.Printf("Updating service: %s", s.name)
 	reload := false
 	r, err := s.expandNodes(len(servers))
 	if err != nil {
+		log.Printf("Error expanding nodes for service %s: %v", s.name, err)
 		return false, err
 	}
 	reload = reload || r
+
 	s.markRemovedNodes(servers)
 	for _, server := range servers {
 		if err = s.handleNode(server); err != nil {
+			log.Printf("Error handling node for service %s: %v", s.name, err)
 			return false, err
 		}
 	}
 	s.reorderNodes(len(servers))
 	r, err = s.updateConfig()
 	if err != nil {
+		log.Printf("Error updating config for service %s: %v", s.name, err)
 		return false, err
 	}
 	reload = reload || r
 	r, err = s.removeExcessNodes(len(servers))
-
 	if err != nil {
+		log.Printf("Error removing excess nodes for service %s: %v", s.name, err)
 		return false, err
 	}
 	reload = reload || r
+
 	return reload, nil
 }
 
@@ -216,26 +223,6 @@ func (s *Service) handleNode(server ServiceServer) error {
 		return nil
 	}
 	return s.setServer(server)
-	/*
-		// If we want to update an existing server, but we shouldn't need this in our environment
-		for _, sNode := range s.nodes {
-			if s.nodesMatch(sNode, server) {
-				sNode.modified = true
-				sNode.disabled = false
-				sNode.address = server.Address
-				sNode.port = int64(server.Port)
-
-				if server.Weight != nil { // Check if Weight is set
-					sNode.weight = server.Weight
-				} else {
-					defaultWeight := int64(128)
-					sNode.weight = &defaultWeight // Set to default if not provided
-				}
-				break
-			}
-		}
-		return nil
-	*/
 }
 
 func (s *Service) createNewNodes(nodeCount int) error {
@@ -313,9 +300,12 @@ func (s *Service) createBackend(from string) (bool, error) {
 	return false, nil
 }
 
+// loadNodes loads the existing nodes for the service.
 func (s *Service) loadNodes() (bool, error) {
+	log.Printf("Loading nodes for service %s", s.name)
 	_, servers, err := s.client.GetServers("backend", s.name, s.transactionID)
 	if err != nil {
+		log.Printf("Error loading nodes for service %s: %v", s.name, err)
 		return false, err
 	}
 	for _, server := range servers {
@@ -337,7 +327,9 @@ func (s *Service) loadNodes() (bool, error) {
 	return false, nil
 }
 
+// updateConfig updates the configuration for the service.
 func (s *Service) updateConfig() (bool, error) {
+	log.Printf("Updating configuration for service %s", s.name)
 	reload := false
 	for _, node := range s.nodes {
 		if node.modified {
@@ -359,12 +351,14 @@ func (s *Service) updateConfig() (bool, error) {
 			}
 			err := s.client.EditServer(node.name, "backend", s.name, server, s.transactionID, 0)
 			if err != nil {
+				log.Printf("Failed to update configuration for node %s in service %s: %v", node.name, s.name, err)
 				return false, err
 			}
 			node.modified = false
 			reload = true
 		}
 	}
+	log.Printf("Configuration update completed for service %s. Reload required: %t", s.name, reload)
 	return reload, nil
 }
 
@@ -404,13 +398,13 @@ func (s *Service) setServer(server ServiceServer) error {
 	return nil
 }
 
+// addNode adds a new node to the service.
 func (s *Service) addNode() error {
 	name := s.getNodeName()
-
+	log.Printf("Adding node to service %s. Node name: %s", s.name, name)
 	// Create a temporary ServiceServer instance to use getNodeWeight method
 	newServer := ServiceServer{}
 	weight := newServer.getNodeWeight()
-
 	server := &models.Server{
 		Name:    name,
 		Address: "127.0.0.1",
@@ -422,6 +416,7 @@ func (s *Service) addNode() error {
 	}
 	err := s.client.CreateServer("backend", s.name, server, s.transactionID, 0)
 	if err != nil {
+		log.Printf("Error adding node %s to service %s: %v", name, s.name, err)
 		return err
 	}
 	s.nodes = append(s.nodes, &serviceNode{
