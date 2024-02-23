@@ -33,6 +33,7 @@ const ServiceGrowthTypeExponential = "exponential"
 type ServiceServer struct {
 	Address string
 	Port    int
+	Name    string
 	Weight  *int64 // Optional weight field
 }
 
@@ -400,11 +401,13 @@ func (s *Service) setServer(server ServiceServer) error {
 
 // addNode adds a new node to the service.
 func (s *Service) addNode() error {
-	name := s.getNodeName()
-	log.Printf("Adding node to service %s. Node name: %s", s.name, name)
+
 	// Create a temporary ServiceServer instance to use getNodeWeight method
 	newServer := ServiceServer{}
 	weight := newServer.getNodeWeight()
+	name := newServer.getServerNodeName(s) // name := s.getNodeName()
+	log.Printf("Adding node to service %s. Node name: %s", s.name, name)
+
 	server := &models.Server{
 		Name:    name,
 		Address: "127.0.0.1",
@@ -437,6 +440,15 @@ func (s *Service) getNodeName() string {
 	}
 	s.usedNames[name] = struct{}{}
 	return name
+}
+
+func (s *ServiceServer) getServerNodeName(service *Service) string {
+	defaultName := service.getNodeName() // Default name is using the RandomFunction
+
+	if s != nil && s.Name != "" {
+		return s.Name // Use provided name
+	}
+	return defaultName // Use default random name if not provided
 }
 
 func (s *ServiceServer) getNodeWeight() int64 {
