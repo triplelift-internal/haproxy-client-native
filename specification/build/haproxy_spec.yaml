@@ -4055,7 +4055,6 @@ definitions:
               type: string
               x-dependency:
                   type:
-                      required: true
                       value: redirect
               x-display-name: Redirect Option
           redir_type:
@@ -7195,6 +7194,7 @@ definitions:
           hrsp_other: 0
           iid: 0
           intercepted: 346
+          last_chk: L4OK in 0ms
           mode: http
           pid: 3204
           rate: 64
@@ -7477,6 +7477,11 @@ definitions:
                   type:
                       - frontend
                       - backend
+              x-nullable: true
+          last_chk:
+              type: string
+              x-dependency:
+                  type: server
               x-nullable: true
           lastchg:
               type: integer
@@ -9853,6 +9858,14 @@ definitions:
       x-go-name: ReturnHeader
   compression:
       properties:
+          algo-req:
+              enum:
+                  - identity
+                  - gzip
+                  - deflate
+                  - raw-deflate
+              type: string
+              x-omitempty: true
           algorithms:
               items:
                   enum:
@@ -9863,9 +9876,36 @@ definitions:
                   type: string
               type: array
               x-omitempty: true
+          algos-res:
+              items:
+                  enum:
+                      - identity
+                      - gzip
+                      - deflate
+                      - raw-deflate
+                  type: string
+              type: array
+              x-omitempty: true
+          direction:
+              enum:
+                  - request
+                  - response
+                  - both
+              type: string
+              x-omitempty: true
           offload:
               type: boolean
           types:
+              items:
+                  type: string
+              type: array
+              x-omitempty: true
+          types-req:
+              items:
+                  type: string
+              type: array
+              x-omitempty: true
+          types-res:
               items:
                   type: string
               type: array

@@ -35,28 +35,106 @@ import (
 //
 // swagger:model compression
 type Compression struct {
+	// algo req
+	// Enum: [identity gzip deflate raw-deflate]
+	// +kubebuilder:validation:Enum=identity;gzip;deflate;raw-deflate;
+	AlgoReq string `json:"algo-req,omitempty"`
 
 	// algorithms
 	Algorithms []string `json:"algorithms,omitempty"`
+
+	// algos res
+	AlgosRes []string `json:"algos-res,omitempty"`
+
+	// direction
+	// Enum: [request response both]
+	// +kubebuilder:validation:Enum=request;response;both;
+	Direction string `json:"direction,omitempty"`
 
 	// offload
 	Offload bool `json:"offload,omitempty"`
 
 	// types
 	Types []string `json:"types,omitempty"`
+
+	// types req
+	TypesReq []string `json:"types-req,omitempty"`
+
+	// types res
+	TypesRes []string `json:"types-res,omitempty"`
 }
 
 // Validate validates this compression
 func (m *Compression) Validate(formats strfmt.Registry) error {
 	var res []error
 
+	if err := m.validateAlgoReq(formats); err != nil {
+		res = append(res, err)
+	}
+
 	if err := m.validateAlgorithms(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateAlgosRes(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateDirection(formats); err != nil {
 		res = append(res, err)
 	}
 
 	if len(res) > 0 {
 		return errors.CompositeValidationError(res...)
 	}
+	return nil
+}
+
+var compressionTypeAlgoReqPropEnum []interface{}
+
+func init() {
+	var res []string
+	if err := json.Unmarshal([]byte(`["identity","gzip","deflate","raw-deflate"]`), &res); err != nil {
+		panic(err)
+	}
+	for _, v := range res {
+		compressionTypeAlgoReqPropEnum = append(compressionTypeAlgoReqPropEnum, v)
+	}
+}
+
+const (
+
+	// CompressionAlgoReqIdentity captures enum value "identity"
+	CompressionAlgoReqIdentity string = "identity"
+
+	// CompressionAlgoReqGzip captures enum value "gzip"
+	CompressionAlgoReqGzip string = "gzip"
+
+	// CompressionAlgoReqDeflate captures enum value "deflate"
+	CompressionAlgoReqDeflate string = "deflate"
+
+	// CompressionAlgoReqRawDashDeflate captures enum value "raw-deflate"
+	CompressionAlgoReqRawDashDeflate string = "raw-deflate"
+)
+
+// prop value enum
+func (m *Compression) validateAlgoReqEnum(path, location string, value string) error {
+	if err := validate.EnumCase(path, location, value, compressionTypeAlgoReqPropEnum, true); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *Compression) validateAlgoReq(formats strfmt.Registry) error {
+	if swag.IsZero(m.AlgoReq) { // not required
+		return nil
+	}
+
+	// value enum
+	if err := m.validateAlgoReqEnum("algo-req", "body", m.AlgoReq); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -91,6 +169,87 @@ func (m *Compression) validateAlgorithms(formats strfmt.Registry) error {
 			return err
 		}
 
+	}
+
+	return nil
+}
+
+var compressionAlgosResItemsEnum []interface{}
+
+func init() {
+	var res []string
+	if err := json.Unmarshal([]byte(`["identity","gzip","deflate","raw-deflate"]`), &res); err != nil {
+		panic(err)
+	}
+	for _, v := range res {
+		compressionAlgosResItemsEnum = append(compressionAlgosResItemsEnum, v)
+	}
+}
+
+func (m *Compression) validateAlgosResItemsEnum(path, location string, value string) error {
+	if err := validate.EnumCase(path, location, value, compressionAlgosResItemsEnum, true); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *Compression) validateAlgosRes(formats strfmt.Registry) error {
+	if swag.IsZero(m.AlgosRes) { // not required
+		return nil
+	}
+
+	for i := 0; i < len(m.AlgosRes); i++ {
+
+		// value enum
+		if err := m.validateAlgosResItemsEnum("algos-res"+"."+strconv.Itoa(i), "body", m.AlgosRes[i]); err != nil {
+			return err
+		}
+
+	}
+
+	return nil
+}
+
+var compressionTypeDirectionPropEnum []interface{}
+
+func init() {
+	var res []string
+	if err := json.Unmarshal([]byte(`["request","response","both"]`), &res); err != nil {
+		panic(err)
+	}
+	for _, v := range res {
+		compressionTypeDirectionPropEnum = append(compressionTypeDirectionPropEnum, v)
+	}
+}
+
+const (
+
+	// CompressionDirectionRequest captures enum value "request"
+	CompressionDirectionRequest string = "request"
+
+	// CompressionDirectionResponse captures enum value "response"
+	CompressionDirectionResponse string = "response"
+
+	// CompressionDirectionBoth captures enum value "both"
+	CompressionDirectionBoth string = "both"
+)
+
+// prop value enum
+func (m *Compression) validateDirectionEnum(path, location string, value string) error {
+	if err := validate.EnumCase(path, location, value, compressionTypeDirectionPropEnum, true); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *Compression) validateDirection(formats strfmt.Registry) error {
+	if swag.IsZero(m.Direction) { // not required
+		return nil
+	}
+
+	// value enum
+	if err := m.validateDirectionEnum("direction", "body", m.Direction); err != nil {
+		return err
 	}
 
 	return nil
