@@ -35,6 +35,7 @@ type ServiceServer struct {
 	Port    int
 	Name    string
 	Weight  *int64 // Optional weight field
+	Backup  string
 }
 
 type serviceNode struct {
@@ -44,6 +45,7 @@ type serviceNode struct {
 	disabled bool
 	modified bool
 	weight   *int64 // Optional weight field
+	backup   string
 }
 
 // Service represents the mapping from a discovery service into a configuration backend.
@@ -214,6 +216,7 @@ func (s *Service) markRemovedNodes(servers []ServiceServer) {
 			node.address = "127.0.0.1"
 			node.port = 80
 			node.weight = misc.Int64P(128)
+			node.backup = "disabled"
 		}
 	}
 }
@@ -316,6 +319,7 @@ func (s *Service) loadNodes() (bool, error) {
 			port:     *server.Port,
 			weight:   server.Weight,
 			modified: false,
+			backup:   server.Backup,
 		}
 		if server.Maintenance == "enabled" {
 			sNode.disabled = true
@@ -338,6 +342,10 @@ func (s *Service) updateConfig() (bool, error) {
 			if node.weight != nil {
 				weight = *node.weight // Use the node's weight if set
 			}
+			backup := "disabled"
+			if node.backup != "" { // If backup value is not null than enable as a backup server
+				backup = "enabled"
+			}
 			server := &models.Server{
 				Name:    node.name,
 				Address: node.address,
@@ -345,6 +353,7 @@ func (s *Service) updateConfig() (bool, error) {
 				ServerParams: models.ServerParams{
 					Weight: misc.Int64P(int(weight)),
 					Check:  "enabled",
+					Backup: backup,
 				},
 			}
 			if node.disabled {
@@ -373,7 +382,7 @@ func (s *Service) nodeRemoved(node *serviceNode, servers []ServiceServer) bool {
 }
 
 func (s *Service) nodesMatch(sNode *serviceNode, servers ServiceServer) bool {
-	return !sNode.disabled && sNode.address == servers.Address && sNode.port == int64(servers.Port) && sNode.weight == servers.Weight
+	return !sNode.disabled && sNode.address == servers.Address && sNode.port == int64(servers.Port) && sNode.weight == servers.Weight && sNode.backup == servers.Backup
 }
 
 func (s *Service) serverExists(server ServiceServer) bool {
@@ -393,6 +402,7 @@ func (s *Service) setServer(server ServiceServer) error {
 			sNode.address = server.Address
 			sNode.port = int64(server.Port)
 			sNode.weight = server.Weight
+			sNode.backup = server.Backup
 			break
 		}
 	}
@@ -415,6 +425,7 @@ func (s *Service) addNode() error {
 		ServerParams: models.ServerParams{
 			Weight:      misc.Int64P(int(weight)),
 			Maintenance: "enabled",
+			Backup:      "disabled",
 		},
 	}
 	err := s.client.CreateServer("backend", s.name, server, s.transactionID, 0)
@@ -429,6 +440,7 @@ func (s *Service) addNode() error {
 		weight:   &weight,
 		modified: false,
 		disabled: true,
+		backup:   "disabled",
 	})
 	return nil
 }
@@ -476,11 +488,13 @@ func (s *Service) swapDisabledNode(index int) {
 			s.nodes[index].address = s.nodes[i].address
 			s.nodes[index].port = s.nodes[i].port
 			s.nodes[index].weight = s.nodes[i].weight
+			s.nodes[index].backup = s.nodes[i].backup
 			s.nodes[index].disabled = false
 			s.nodes[index].modified = true
 			s.nodes[i].address = "127.0.0.1"
 			s.nodes[i].port = 80
 			s.nodes[i].weight = misc.Int64P(128)
+			s.nodes[i].backup = "disabled"
 			break
 		}
 	}
