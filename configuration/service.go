@@ -420,7 +420,7 @@ func (s *Service) addNode() error {
 	// Create a temporary ServiceServer instance to use getNodeWeight method
 	newServer := ServiceServer{}
 	weight := newServer.getNodeWeight()
-	name := newServer.getServerNodeName(s) // name := s.getNodeName()
+	name := s.getNodeName(&newServer)
 	log.Printf("Adding node to service %s. Node name: %s", s.name, name)
 
 	server := &models.Server{
@@ -450,23 +450,28 @@ func (s *Service) addNode() error {
 	return nil
 }
 
-func (s *Service) getNodeName() string {
+// Modified getNodeName to incorporate logic from getServerNodeName.
+// It now accepts an optional server instance (pointer to ServiceServer) which could be nil.
+func (s *Service) getNodeName(server *ServiceServer) string {
+	if server != nil && server.Name != "" && strings.HasPrefix(server.Name, "i-") {
+		log.Printf("Using provided name for server node: %s", server.Name)
+		// Check if the provided name is already used to ensure uniqueness.
+		if _, exists := s.usedNames[server.Name]; !exists {
+			s.usedNames[server.Name] = struct{}{}
+			return server.Name // Use provided name
+		}
+		// If name exists, log and fall through to generate a random name.
+		log.Printf("Provided name %s already exists, generating a random name instead.", server.Name)
+	}
+
+	// Generate a random name if no valid provided name or if it already exists.
 	name := fmt.Sprintf("SRV_%s", misc.RandomString(5))
 	for _, ok := s.usedNames[name]; ok; {
 		name = fmt.Sprintf("SRV_%s", misc.RandomString(5))
 	}
 	s.usedNames[name] = struct{}{}
+	log.Printf("Using default name for server node: %s", name)
 	return name
-}
-
-func (s *ServiceServer) getServerNodeName(service *Service) string {
-	defaultName := service.getNodeName() // Default name is using the RandomFunction
-
-	if s != nil && s.Name != "" && strings.HasPrefix(s.Name, "i-") {
-		log.Printf("Using provided name for server node: %s", s.Name)
-		return s.Name // Use provided name
-	}
-	return defaultName // Use default random name if not provided
 }
 
 func (s *ServiceServer) getNodeWeight() int64 {
