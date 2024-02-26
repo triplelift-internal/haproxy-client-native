@@ -18,6 +18,7 @@ package configuration
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/haproxytech/client-native/v5/misc"
 	"github.com/haproxytech/client-native/v5/models"
@@ -345,8 +346,8 @@ func (s *Service) updateConfig() (bool, error) {
 			if node.weight != nil {
 				weight = *node.weight // Use the node's weight if set
 			}
-			backup := "disabled"
-			if node.backup != "" || node.backup == "enabled" { // If backup value is not null than enable as a backup server
+			backup := "disabled"          // Default disable
+			if node.backup == "enabled" { // If backup value is set enable as a backup server
 				backup = "enabled"
 			}
 			server := &models.Server{
@@ -361,7 +362,6 @@ func (s *Service) updateConfig() (bool, error) {
 			}
 			if node.disabled {
 				server.Maintenance = "enabled"
-				server.Backup = "disabled"
 			}
 			err := s.client.EditServer(node.name, "backend", s.name, server, s.transactionID, 0)
 			if err != nil {
@@ -386,7 +386,7 @@ func (s *Service) nodeRemoved(node *serviceNode, servers []ServiceServer) bool {
 }
 
 func (s *Service) nodesMatch(sNode *serviceNode, servers ServiceServer) bool {
-	return !sNode.disabled && sNode.address == servers.Address && sNode.port == int64(servers.Port) && sNode.weight == servers.Weight && sNode.backup == servers.Backup
+	return !sNode.disabled && sNode.address == servers.Address && sNode.port == int64(servers.Port) && sNode.weight == servers.Weight && sNode.backup == servers.Backup && sNode.name == servers.Name
 }
 
 func (s *Service) serverExists(server ServiceServer) bool {
@@ -407,6 +407,7 @@ func (s *Service) setServer(server ServiceServer) error {
 			sNode.port = int64(server.Port)
 			sNode.weight = server.Weight
 			sNode.backup = server.Backup
+			sNode.name = server.Name
 			break
 		}
 	}
@@ -461,7 +462,8 @@ func (s *Service) getNodeName() string {
 func (s *ServiceServer) getServerNodeName(service *Service) string {
 	defaultName := service.getNodeName() // Default name is using the RandomFunction
 
-	if s != nil && s.Name != "" {
+	if s != nil && s.Name != "" && strings.HasPrefix(s.Name, "i-") {
+		log.Printf("Using provided name for server node: %s", s.Name)
 		return s.Name // Use provided name
 	}
 	return defaultName // Use default random name if not provided
@@ -489,12 +491,14 @@ func (s *Service) swapDisabledNode(index int) {
 		if !s.nodes[i].disabled {
 			s.nodes[i].disabled = true
 			s.nodes[i].modified = true
+			s.nodes[index].name = s.nodes[i].name
 			s.nodes[index].address = s.nodes[i].address
 			s.nodes[index].port = s.nodes[i].port
 			s.nodes[index].weight = s.nodes[i].weight
 			s.nodes[index].backup = s.nodes[i].backup
 			s.nodes[index].disabled = false
 			s.nodes[index].modified = true
+			s.nodes[index].name = s.nodes[i].name
 			s.nodes[i].address = "127.0.0.1"
 			s.nodes[i].port = 80
 			s.nodes[i].weight = misc.Int64P(128)
