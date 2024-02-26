@@ -496,14 +496,12 @@ func (s *Service) swapDisabledNode(index int) {
 		if !s.nodes[i].disabled {
 			s.nodes[i].disabled = true
 			s.nodes[i].modified = true
-			s.nodes[index].name = s.nodes[i].name
 			s.nodes[index].address = s.nodes[i].address
 			s.nodes[index].port = s.nodes[i].port
 			s.nodes[index].weight = s.nodes[i].weight
 			s.nodes[index].backup = s.nodes[i].backup
 			s.nodes[index].disabled = false
 			s.nodes[index].modified = true
-			s.nodes[index].name = s.nodes[i].name
 			s.nodes[i].address = "127.0.0.1"
 			s.nodes[i].port = 80
 			s.nodes[i].weight = misc.Int64P(128)
