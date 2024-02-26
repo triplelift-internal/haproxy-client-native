@@ -146,8 +146,9 @@ func (s *Service) Update(servers []ServiceServer) (bool, error) {
 
 	s.markRemovedNodes(servers)
 	for _, server := range servers {
+		log.Printf("Handling server update - Name: %s, Address: %s, Port: %d, Backup: %s", server.Name, server.Address, server.Port, server.Backup)
 		if err = s.handleNode(server); err != nil {
-			log.Printf("Error handling node for service %s: %v", s.name, err)
+			log.Printf("Error handling node (Name: %s) for service %s: %v", server.Name, s.name, err)
 			return false, err
 		}
 	}
@@ -223,6 +224,7 @@ func (s *Service) markRemovedNodes(servers []ServiceServer) {
 
 func (s *Service) handleNode(server ServiceServer) error {
 	// Existing logic to check if server exists...
+	log.Printf("Node handled - Name: %s, Backup: %s", server.Name, server.Backup)
 	if s.serverExists(server) {
 		return nil
 	}
@@ -337,13 +339,14 @@ func (s *Service) updateConfig() (bool, error) {
 	log.Printf("Updating configuration for service %s", s.name)
 	reload := false
 	for _, node := range s.nodes {
+		log.Printf("Updating node - Name: %s, Backup: %s", node.name, node.backup)
 		if node.modified {
 			weight := int64(128) // Default weight
 			if node.weight != nil {
 				weight = *node.weight // Use the node's weight if set
 			}
 			backup := "disabled"
-			if node.backup != "" { // If backup value is not null than enable as a backup server
+			if node.backup != "" || node.backup == "enabled" { // If backup value is not null than enable as a backup server
 				backup = "enabled"
 			}
 			server := &models.Server{
@@ -358,6 +361,7 @@ func (s *Service) updateConfig() (bool, error) {
 			}
 			if node.disabled {
 				server.Maintenance = "enabled"
+				server.Backup = "disabled"
 			}
 			err := s.client.EditServer(node.name, "backend", s.name, server, s.transactionID, 0)
 			if err != nil {
