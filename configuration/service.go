@@ -17,11 +17,9 @@ package configuration
 
 import (
 	"fmt"
-	"log"
-	"strings"
-
 	"github.com/haproxytech/client-native/v5/misc"
 	"github.com/haproxytech/client-native/v5/models"
+	"log"
 )
 
 // ServiceGrowthTypeLinear indicates linear growth type in ScalingParams.
@@ -34,7 +32,6 @@ const ServiceGrowthTypeExponential = "exponential"
 type ServiceServer struct {
 	Address string
 	Port    int
-	Name    string
 	Weight  *int64 // Optional weight field
 	Backup  string
 }
@@ -147,9 +144,9 @@ func (s *Service) Update(servers []ServiceServer) (bool, error) {
 
 	s.markRemovedNodes(servers)
 	for _, server := range servers {
-		log.Printf("Handling server update - Name: %s, Address: %s, Port: %d, Backup: %s", server.Name, server.Address, server.Port, server.Backup)
+		log.Printf("Handling server update - Address: %s, Port: %d, Backup: %s", server.Address, server.Port, server.Backup)
 		if err = s.handleNode(server); err != nil {
-			log.Printf("Error handling node (Name: %s) for service %s: %v", server.Name, s.name, err)
+			log.Printf("Error handling node for service %s: %v", s.name, err)
 			return false, err
 		}
 	}
@@ -225,7 +222,7 @@ func (s *Service) markRemovedNodes(servers []ServiceServer) {
 
 func (s *Service) handleNode(server ServiceServer) error {
 	// Existing logic to check if server exists...
-	log.Printf("Node handled - Name: %s, Backup: %s", server.Name, server.Backup)
+	log.Printf("Node handled - Backup: %s", server.Backup)
 	if s.serverExists(server) {
 		return nil
 	}
@@ -386,8 +383,7 @@ func (s *Service) nodeRemoved(node *serviceNode, servers []ServiceServer) bool {
 }
 
 func (s *Service) nodesMatch(sNode *serviceNode, servers ServiceServer) bool {
-	return !sNode.disabled && sNode.address == servers.Address && sNode.port == int64(servers.Port) && sNode.weight == servers.Weight
-	// && sNode.backup == servers.Backup && sNode.name == servers.Name
+	return !sNode.disabled && sNode.address == servers.Address && sNode.port == int64(servers.Port) && sNode.weight == servers.Weight && sNode.backup == servers.Backup
 }
 
 func (s *Service) serverExists(server ServiceServer) bool {
@@ -404,7 +400,6 @@ func (s *Service) setServer(server ServiceServer) error {
 		if sNode.disabled {
 			sNode.modified = true
 			sNode.disabled = false
-			sNode.name = server.Name
 			sNode.address = server.Address
 			sNode.port = int64(server.Port)
 			sNode.weight = server.Weight
@@ -417,13 +412,11 @@ func (s *Service) setServer(server ServiceServer) error {
 
 // addNode adds a new node to the service.
 func (s *Service) addNode() error {
-
+	name := s.getNodeName()
+	log.Printf("Adding node to service %s. Node name: %s", s.name, name)
 	// Create a temporary ServiceServer instance to use getNodeWeight method
 	newServer := ServiceServer{}
 	weight := newServer.getNodeWeight()
-	name := s.getNodeName(&newServer)
-	log.Printf("Adding node to service %s. Node name: %s", s.name, name)
-
 	server := &models.Server{
 		Name:    name,
 		Address: "127.0.0.1",
@@ -451,27 +444,12 @@ func (s *Service) addNode() error {
 	return nil
 }
 
-// Modified getNodeName to incorporate logic from getServerNodeName.
-// It now accepts an optional server instance (pointer to ServiceServer) which could be nil.
-func (s *Service) getNodeName(server *ServiceServer) string {
-	if server != nil && server.Name != "" && strings.HasPrefix(server.Name, "i-") {
-		log.Printf("Using provided name for server node: %s", server.Name)
-		// Check if the provided name is already used to ensure uniqueness.
-		if _, exists := s.usedNames[server.Name]; !exists {
-			s.usedNames[server.Name] = struct{}{}
-			return server.Name // Use provided name
-		}
-		// If name exists, log and fall through to generate a random name.
-		log.Printf("Provided name %s already exists, generating a random name instead.", server.Name)
-	}
-
-	// Generate a random name if no valid provided name or if it already exists.
+func (s *Service) getNodeName() string {
 	name := fmt.Sprintf("SRV_%s", misc.RandomString(5))
 	for _, ok := s.usedNames[name]; ok; {
 		name = fmt.Sprintf("SRV_%s", misc.RandomString(5))
 	}
 	s.usedNames[name] = struct{}{}
-	log.Printf("Using default name for server node: %s", name)
 	return name
 }
 
