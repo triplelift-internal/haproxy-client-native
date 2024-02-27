@@ -314,7 +314,7 @@ func (s *Service) loadNodes() (bool, error) {
 	}
 	for _, server := range servers {
 		sNode := &serviceNode{
-			name:     server.Address,
+			name:     server.Name,
 			address:  server.Address,
 			port:     *server.Port,
 			weight:   server.Weight,
@@ -348,7 +348,7 @@ func (s *Service) updateConfig() (bool, error) {
 				backup = "enabled"
 			}
 			server := &models.Server{
-				Name:    node.address,
+				Name:    node.name,
 				Address: node.address,
 				Port:    misc.Ptr(node.port),
 				ServerParams: models.ServerParams{
