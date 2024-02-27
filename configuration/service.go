@@ -218,7 +218,7 @@ func (s *Service) markRemovedNodes(servers []ServiceServer) {
 			node.address = "127.0.0.1"
 			node.port = 80
 			node.weight = misc.Int64P(128)
-			node.backup = "disabled"
+			node.backup = ""
 		}
 	}
 }
@@ -346,7 +346,7 @@ func (s *Service) updateConfig() (bool, error) {
 			if node.weight != nil {
 				weight = *node.weight // Use the node's weight if set
 			}
-			backup := "disabled"          // Default disable
+			backup := ""                  // Default disable
 			if node.backup == "enabled" { // If backup value is set enable as a backup server
 				backup = "enabled"
 			}
@@ -386,7 +386,8 @@ func (s *Service) nodeRemoved(node *serviceNode, servers []ServiceServer) bool {
 }
 
 func (s *Service) nodesMatch(sNode *serviceNode, servers ServiceServer) bool {
-	return !sNode.disabled && sNode.address == servers.Address && sNode.port == int64(servers.Port) && sNode.weight == servers.Weight && sNode.backup == servers.Backup && sNode.name == servers.Name
+	return !sNode.disabled && sNode.address == servers.Address && sNode.port == int64(servers.Port) && sNode.weight == servers.Weight
+	// && sNode.backup == servers.Backup && sNode.name == servers.Name
 }
 
 func (s *Service) serverExists(server ServiceServer) bool {
@@ -403,11 +404,11 @@ func (s *Service) setServer(server ServiceServer) error {
 		if sNode.disabled {
 			sNode.modified = true
 			sNode.disabled = false
+			sNode.name = server.Name
 			sNode.address = server.Address
 			sNode.port = int64(server.Port)
 			sNode.weight = server.Weight
 			sNode.backup = server.Backup
-			sNode.name = server.Name
 			break
 		}
 	}
@@ -430,7 +431,7 @@ func (s *Service) addNode() error {
 		ServerParams: models.ServerParams{
 			Weight:      misc.Int64P(int(weight)),
 			Maintenance: "enabled",
-			Backup:      "disabled",
+			Backup:      "",
 		},
 	}
 	err := s.client.CreateServer("backend", s.name, server, s.transactionID, 0)
@@ -445,7 +446,7 @@ func (s *Service) addNode() error {
 		weight:   &weight,
 		modified: false,
 		disabled: true,
-		backup:   "disabled",
+		backup:   "",
 	})
 	return nil
 }
@@ -505,7 +506,7 @@ func (s *Service) swapDisabledNode(index int) {
 			s.nodes[i].address = "127.0.0.1"
 			s.nodes[i].port = 80
 			s.nodes[i].weight = misc.Int64P(128)
-			s.nodes[i].backup = "disabled"
+			s.nodes[i].backup = ""
 			break
 		}
 	}
