@@ -17,10 +17,9 @@ package configuration
 
 import (
 	"fmt"
-	"log"
-
 	"github.com/haproxytech/client-native/v5/misc"
 	"github.com/haproxytech/client-native/v5/models"
+	"log"
 )
 
 // ServiceGrowthTypeLinear indicates linear growth type in ScalingParams.
@@ -33,7 +32,6 @@ const ServiceGrowthTypeExponential = "exponential"
 type ServiceServer struct {
 	Address string
 	Port    int
-	Name    string
 	Weight  *int64 // Optional weight field
 	Backup  string
 }
@@ -146,6 +144,7 @@ func (s *Service) Update(servers []ServiceServer) (bool, error) {
 
 	s.markRemovedNodes(servers)
 	for _, server := range servers {
+		log.Printf("Handling server update - Address: %s, Port: %d, Backup: %s", server.Address, server.Port, server.Backup)
 		if err = s.handleNode(server); err != nil {
 			log.Printf("Error handling node for service %s: %v", s.name, err)
 			return false, err
@@ -216,13 +215,14 @@ func (s *Service) markRemovedNodes(servers []ServiceServer) {
 			node.address = "127.0.0.1"
 			node.port = 80
 			node.weight = misc.Int64P(128)
-			node.backup = "disabled"
+			node.backup = ""
 		}
 	}
 }
 
 func (s *Service) handleNode(server ServiceServer) error {
 	// Existing logic to check if server exists...
+	log.Printf("Node handled - Backup: %s", server.Backup)
 	if s.serverExists(server) {
 		return nil
 	}
@@ -337,13 +337,14 @@ func (s *Service) updateConfig() (bool, error) {
 	log.Printf("Updating configuration for service %s", s.name)
 	reload := false
 	for _, node := range s.nodes {
+		log.Printf("Updating node - Name: %s, Backup: %s", node.name, node.backup)
 		if node.modified {
 			weight := int64(128) // Default weight
 			if node.weight != nil {
 				weight = *node.weight // Use the node's weight if set
 			}
-			backup := "disabled"
-			if node.backup != "" { // If backup value is not null than enable as a backup server
+			backup := ""                  // Default disable
+			if node.backup == "enabled" { // If backup value is set enable as a backup server
 				backup = "enabled"
 			}
 			server := &models.Server{
@@ -411,13 +412,11 @@ func (s *Service) setServer(server ServiceServer) error {
 
 // addNode adds a new node to the service.
 func (s *Service) addNode() error {
-
+	name := s.getNodeName()
+	log.Printf("Adding node to service %s. Node name: %s", s.name, name)
 	// Create a temporary ServiceServer instance to use getNodeWeight method
 	newServer := ServiceServer{}
 	weight := newServer.getNodeWeight()
-	name := newServer.getServerNodeName(s) // name := s.getNodeName()
-	log.Printf("Adding node to service %s. Node name: %s", s.name, name)
-
 	server := &models.Server{
 		Name:    name,
 		Address: "127.0.0.1",
@@ -425,7 +424,7 @@ func (s *Service) addNode() error {
 		ServerParams: models.ServerParams{
 			Weight:      misc.Int64P(int(weight)),
 			Maintenance: "enabled",
-			Backup:      "disabled",
+			Backup:      "",
 		},
 	}
 	err := s.client.CreateServer("backend", s.name, server, s.transactionID, 0)
@@ -440,7 +439,7 @@ func (s *Service) addNode() error {
 		weight:   &weight,
 		modified: false,
 		disabled: true,
-		backup:   "disabled",
+		backup:   "",
 	})
 	return nil
 }
@@ -452,15 +451,6 @@ func (s *Service) getNodeName() string {
 	}
 	s.usedNames[name] = struct{}{}
 	return name
-}
-
-func (s *ServiceServer) getServerNodeName(service *Service) string {
-	defaultName := service.getNodeName() // Default name is using the RandomFunction
-
-	if s != nil && s.Name != "" {
-		return s.Name // Use provided name
-	}
-	return defaultName // Use default random name if not provided
 }
 
 func (s *ServiceServer) getNodeWeight() int64 {
@@ -494,7 +484,7 @@ func (s *Service) swapDisabledNode(index int) {
 			s.nodes[i].address = "127.0.0.1"
 			s.nodes[i].port = 80
 			s.nodes[i].weight = misc.Int64P(128)
-			s.nodes[i].backup = "disabled"
+			s.nodes[i].backup = ""
 			break
 		}
 	}
