@@ -17,10 +17,9 @@ package configuration
 
 import (
 	"fmt"
-	"log"
-
 	"github.com/haproxytech/client-native/v5/misc"
 	"github.com/haproxytech/client-native/v5/models"
+	"log"
 )
 
 // ServiceGrowthTypeLinear indicates linear growth type in ScalingParams.
@@ -34,6 +33,7 @@ type ServiceServer struct {
 	Address string
 	Port    int
 	Weight  *int64 // Optional weight field
+	Backup  string
 }
 
 type serviceNode struct {
@@ -43,6 +43,7 @@ type serviceNode struct {
 	disabled bool
 	modified bool
 	weight   *int64 // Optional weight field
+	backup   string
 }
 
 // Service represents the mapping from a discovery service into a configuration backend.
@@ -143,6 +144,7 @@ func (s *Service) Update(servers []ServiceServer) (bool, error) {
 
 	s.markRemovedNodes(servers)
 	for _, server := range servers {
+		log.Printf("Handling server update - Address: %s, Port: %d, Backup: %s", server.Address, server.Port, server.Backup)
 		if err = s.handleNode(server); err != nil {
 			log.Printf("Error handling node for service %s: %v", s.name, err)
 			return false, err
@@ -213,12 +215,14 @@ func (s *Service) markRemovedNodes(servers []ServiceServer) {
 			node.address = "127.0.0.1"
 			node.port = 80
 			node.weight = misc.Int64P(128)
+			node.backup = ""
 		}
 	}
 }
 
 func (s *Service) handleNode(server ServiceServer) error {
 	// Existing logic to check if server exists...
+	log.Printf("Node handled - Backup: %s", server.Backup)
 	if s.serverExists(server) {
 		return nil
 	}
@@ -315,6 +319,7 @@ func (s *Service) loadNodes() (bool, error) {
 			port:     *server.Port,
 			weight:   server.Weight,
 			modified: false,
+			backup:   server.Backup,
 		}
 		if server.Maintenance == "enabled" {
 			sNode.disabled = true
@@ -332,10 +337,15 @@ func (s *Service) updateConfig() (bool, error) {
 	log.Printf("Updating configuration for service %s", s.name)
 	reload := false
 	for _, node := range s.nodes {
+		log.Printf("Updating node - Name: %s, Backup: %s", node.name, node.backup)
 		if node.modified {
 			weight := int64(128) // Default weight
 			if node.weight != nil {
 				weight = *node.weight // Use the node's weight if set
+			}
+			backup := ""                  // Default disable
+			if node.backup == "enabled" { // If backup value is set enable as a backup server
+				backup = "enabled"
 			}
 			server := &models.Server{
 				Name:    node.name,
@@ -344,6 +354,7 @@ func (s *Service) updateConfig() (bool, error) {
 				ServerParams: models.ServerParams{
 					Weight: misc.Int64P(int(weight)),
 					Check:  "enabled",
+					Backup: backup,
 				},
 			}
 			if node.disabled {
@@ -372,7 +383,7 @@ func (s *Service) nodeRemoved(node *serviceNode, servers []ServiceServer) bool {
 }
 
 func (s *Service) nodesMatch(sNode *serviceNode, servers ServiceServer) bool {
-	return !sNode.disabled && sNode.address == servers.Address && sNode.port == int64(servers.Port) && sNode.weight == servers.Weight
+	return !sNode.disabled && sNode.address == servers.Address && sNode.port == int64(servers.Port) && sNode.weight == servers.Weight && sNode.backup == servers.Backup
 }
 
 func (s *Service) serverExists(server ServiceServer) bool {
@@ -392,6 +403,7 @@ func (s *Service) setServer(server ServiceServer) error {
 			sNode.address = server.Address
 			sNode.port = int64(server.Port)
 			sNode.weight = server.Weight
+			sNode.backup = server.Backup
 			break
 		}
 	}
@@ -412,6 +424,7 @@ func (s *Service) addNode() error {
 		ServerParams: models.ServerParams{
 			Weight:      misc.Int64P(int(weight)),
 			Maintenance: "enabled",
+			Backup:      "",
 		},
 	}
 	err := s.client.CreateServer("backend", s.name, server, s.transactionID, 0)
@@ -426,6 +439,7 @@ func (s *Service) addNode() error {
 		weight:   &weight,
 		modified: false,
 		disabled: true,
+		backup:   "",
 	})
 	return nil
 }
@@ -464,11 +478,13 @@ func (s *Service) swapDisabledNode(index int) {
 			s.nodes[index].address = s.nodes[i].address
 			s.nodes[index].port = s.nodes[i].port
 			s.nodes[index].weight = s.nodes[i].weight
+			s.nodes[index].backup = s.nodes[i].backup
 			s.nodes[index].disabled = false
 			s.nodes[index].modified = true
 			s.nodes[i].address = "127.0.0.1"
 			s.nodes[i].port = 80
 			s.nodes[i].weight = misc.Int64P(128)
+			s.nodes[i].backup = ""
 			break
 		}
 	}
