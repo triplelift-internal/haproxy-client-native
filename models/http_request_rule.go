@@ -78,8 +78,8 @@ type HTTPRequestRule struct {
 	CaptureLen int64 `json:"capture_len,omitempty"`
 
 	// capture sample
-	// Pattern: ^[^\s]+$
-	// +kubebuilder:validation:Pattern=`^[^\s]+$`
+	// Pattern: ^(?:[A-Za-z]+\("([A-Za-z\s]+)"\)|[A-Za-z]+)
+	// +kubebuilder:validation:Pattern=`^(?:[A-Za-z]+\("([A-Za-z\s]+)"\)|[A-Za-z]+)`
 	CaptureSample string `json:"capture_sample,omitempty"`
 
 	// cond
@@ -124,6 +124,7 @@ type HTTPRequestRule struct {
 
 	// index
 	// Required: true
+	// +kubebuilder:validation:Optional
 	Index *int64 `json:"index"`
 
 	// log level
@@ -172,8 +173,8 @@ type HTTPRequestRule struct {
 	NiceValue int64 `json:"nice_value,omitempty"`
 
 	// normalizer
-	// Enum: [fragment-encode fragment-strip path-merge-slashes path-strip-dot path-strip-dotdot percent-decode-unreserved percent-to-upercase query-sort-by-name]
-	// +kubebuilder:validation:Enum=fragment-encode;fragment-strip;path-merge-slashes;path-strip-dot;path-strip-dotdot;percent-decode-unreserved;percent-to-upercase;query-sort-by-name;
+	// Enum: [fragment-encode fragment-strip path-merge-slashes path-strip-dot path-strip-dotdot percent-decode-unreserved percent-to-uppercase query-sort-by-name]
+	// +kubebuilder:validation:Enum=fragment-encode;fragment-strip;path-merge-slashes;path-strip-dot;path-strip-dotdot;percent-decode-unreserved;percent-to-uppercase;query-sort-by-name;
 	Normalizer string `json:"normalizer,omitempty"`
 
 	// normalizer full
@@ -238,6 +239,9 @@ type HTTPRequestRule struct {
 	// +kubebuilder:validation:Maximum=599
 	// +kubebuilder:validation:Minimum=200
 	ReturnStatusCode *int64 `json:"return_status_code,omitempty"`
+
+	// rst ttl
+	RstTTL int64 `json:"rst_ttl,omitempty"`
 
 	// sc expr
 	ScExpr string `json:"sc_expr,omitempty"`
@@ -327,8 +331,8 @@ type HTTPRequestRule struct {
 
 	// type
 	// Required: true
-	// Enum: [add-acl add-header allow auth cache-use capture del-acl del-header del-map deny disable-l7-retry do-resolve early-hint lua normalize-uri redirect reject replace-header replace-path replace-pathq replace-uri replace-value return sc-add-gpc sc-inc-gpc sc-inc-gpc0 sc-inc-gpc1 sc-set-gpt0 send-spoe-group set-dst set-dst-port set-header set-log-level set-map set-mark set-method set-nice set-path set-pathq set-priority-class set-priority-offset set-query set-src set-src-port set-timeout set-tos set-uri set-var silent-drop strict-mode tarpit track-sc0 track-sc1 track-sc2 track-sc unset-var use-service wait-for-body wait-for-handshake set-bandwidth-limit]
-	// +kubebuilder:validation:Enum=add-acl;add-header;allow;auth;cache-use;capture;del-acl;del-header;del-map;deny;disable-l7-retry;do-resolve;early-hint;lua;normalize-uri;redirect;reject;replace-header;replace-path;replace-pathq;replace-uri;replace-value;return;sc-add-gpc;sc-inc-gpc;sc-inc-gpc0;sc-inc-gpc1;sc-set-gpt0;send-spoe-group;set-dst;set-dst-port;set-header;set-log-level;set-map;set-mark;set-method;set-nice;set-path;set-pathq;set-priority-class;set-priority-offset;set-query;set-src;set-src-port;set-timeout;set-tos;set-uri;set-var;silent-drop;strict-mode;tarpit;track-sc0;track-sc1;track-sc2;track-sc;unset-var;use-service;wait-for-body;wait-for-handshake;set-bandwidth-limit;
+	// Enum: [add-acl add-header allow auth cache-use capture del-acl del-header del-map deny disable-l7-retry do-resolve early-hint lua normalize-uri redirect reject replace-header replace-path replace-pathq replace-uri replace-value return sc-add-gpc sc-inc-gpc sc-inc-gpc0 sc-inc-gpc1 sc-set-gpt sc-set-gpt0 send-spoe-group set-dst set-dst-port set-header set-log-level set-map set-mark set-method set-nice set-path set-pathq set-priority-class set-priority-offset set-query set-src set-src-port set-timeout set-tos set-uri set-var silent-drop strict-mode tarpit track-sc0 track-sc1 track-sc2 track-sc unset-var use-service wait-for-body wait-for-handshake set-bandwidth-limit]
+	// +kubebuilder:validation:Enum=add-acl;add-header;allow;auth;cache-use;capture;del-acl;del-header;del-map;deny;disable-l7-retry;do-resolve;early-hint;lua;normalize-uri;redirect;reject;replace-header;replace-path;replace-pathq;replace-uri;replace-value;return;sc-add-gpc;sc-inc-gpc;sc-inc-gpc0;sc-inc-gpc1;sc-set-gpt;sc-set-gpt0;send-spoe-group;set-dst;set-dst-port;set-header;set-log-level;set-map;set-mark;set-method;set-nice;set-path;set-pathq;set-priority-class;set-priority-offset;set-query;set-src;set-src-port;set-timeout;set-tos;set-uri;set-var;silent-drop;strict-mode;tarpit;track-sc0;track-sc1;track-sc2;track-sc;unset-var;use-service;wait-for-body;wait-for-handshake;set-bandwidth-limit;
 	Type string `json:"type"`
 
 	// uri fmt
@@ -625,7 +629,7 @@ func (m *HTTPRequestRule) validateCaptureSample(formats strfmt.Registry) error {
 		return nil
 	}
 
-	if err := validate.Pattern("capture_sample", "body", m.CaptureSample, `^[^\s]+$`); err != nil {
+	if err := validate.Pattern("capture_sample", "body", m.CaptureSample, `^(?:[A-Za-z]+\("([A-Za-z\s]+)"\)|[A-Za-z]+)`); err != nil {
 		return err
 	}
 
@@ -878,7 +882,7 @@ var httpRequestRuleTypeNormalizerPropEnum []interface{}
 
 func init() {
 	var res []string
-	if err := json.Unmarshal([]byte(`["fragment-encode","fragment-strip","path-merge-slashes","path-strip-dot","path-strip-dotdot","percent-decode-unreserved","percent-to-upercase","query-sort-by-name"]`), &res); err != nil {
+	if err := json.Unmarshal([]byte(`["fragment-encode","fragment-strip","path-merge-slashes","path-strip-dot","path-strip-dotdot","percent-decode-unreserved","percent-to-uppercase","query-sort-by-name"]`), &res); err != nil {
 		panic(err)
 	}
 	for _, v := range res {
@@ -906,8 +910,8 @@ const (
 	// HTTPRequestRuleNormalizerPercentDashDecodeDashUnreserved captures enum value "percent-decode-unreserved"
 	HTTPRequestRuleNormalizerPercentDashDecodeDashUnreserved string = "percent-decode-unreserved"
 
-	// HTTPRequestRuleNormalizerPercentDashToDashUpercase captures enum value "percent-to-upercase"
-	HTTPRequestRuleNormalizerPercentDashToDashUpercase string = "percent-to-upercase"
+	// HTTPRequestRuleNormalizerPercentDashToDashUppercase captures enum value "percent-to-uppercase"
+	HTTPRequestRuleNormalizerPercentDashToDashUppercase string = "percent-to-uppercase"
 
 	// HTTPRequestRuleNormalizerQueryDashSortDashByDashName captures enum value "query-sort-by-name"
 	HTTPRequestRuleNormalizerQueryDashSortDashByDashName string = "query-sort-by-name"
@@ -1386,7 +1390,7 @@ var httpRequestRuleTypeTypePropEnum []interface{}
 
 func init() {
 	var res []string
-	if err := json.Unmarshal([]byte(`["add-acl","add-header","allow","auth","cache-use","capture","del-acl","del-header","del-map","deny","disable-l7-retry","do-resolve","early-hint","lua","normalize-uri","redirect","reject","replace-header","replace-path","replace-pathq","replace-uri","replace-value","return","sc-add-gpc","sc-inc-gpc","sc-inc-gpc0","sc-inc-gpc1","sc-set-gpt0","send-spoe-group","set-dst","set-dst-port","set-header","set-log-level","set-map","set-mark","set-method","set-nice","set-path","set-pathq","set-priority-class","set-priority-offset","set-query","set-src","set-src-port","set-timeout","set-tos","set-uri","set-var","silent-drop","strict-mode","tarpit","track-sc0","track-sc1","track-sc2","track-sc","unset-var","use-service","wait-for-body","wait-for-handshake","set-bandwidth-limit"]`), &res); err != nil {
+	if err := json.Unmarshal([]byte(`["add-acl","add-header","allow","auth","cache-use","capture","del-acl","del-header","del-map","deny","disable-l7-retry","do-resolve","early-hint","lua","normalize-uri","redirect","reject","replace-header","replace-path","replace-pathq","replace-uri","replace-value","return","sc-add-gpc","sc-inc-gpc","sc-inc-gpc0","sc-inc-gpc1","sc-set-gpt","sc-set-gpt0","send-spoe-group","set-dst","set-dst-port","set-header","set-log-level","set-map","set-mark","set-method","set-nice","set-path","set-pathq","set-priority-class","set-priority-offset","set-query","set-src","set-src-port","set-timeout","set-tos","set-uri","set-var","silent-drop","strict-mode","tarpit","track-sc0","track-sc1","track-sc2","track-sc","unset-var","use-service","wait-for-body","wait-for-handshake","set-bandwidth-limit"]`), &res); err != nil {
 		panic(err)
 	}
 	for _, v := range res {
@@ -1476,6 +1480,9 @@ const (
 
 	// HTTPRequestRuleTypeScDashIncDashGpc1 captures enum value "sc-inc-gpc1"
 	HTTPRequestRuleTypeScDashIncDashGpc1 string = "sc-inc-gpc1"
+
+	// HTTPRequestRuleTypeScDashSetDashGpt captures enum value "sc-set-gpt"
+	HTTPRequestRuleTypeScDashSetDashGpt string = "sc-set-gpt"
 
 	// HTTPRequestRuleTypeScDashSetDashGpt0 captures enum value "sc-set-gpt0"
 	HTTPRequestRuleTypeScDashSetDashGpt0 string = "sc-set-gpt0"

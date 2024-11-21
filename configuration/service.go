@@ -38,8 +38,8 @@ type ServiceServer struct {
 
 type serviceNode struct {
 	address  string
-	port     int64
 	name     string
+	port     int64
 	disabled bool
 	modified bool
 	weight   *int64 // Optional weight field
@@ -63,8 +63,8 @@ type ServiceI interface {
 
 // ScalingParams defines parameter for dynamic server scaling of the Service backend.
 type ScalingParams struct {
-	BaseSlots       int
 	SlotsGrowthType string
+	BaseSlots       int
 	SlotsIncrement  int
 }
 

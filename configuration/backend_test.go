@@ -266,6 +266,14 @@ func TestGetBackends(t *testing.T) { //nolint:gocognit,gocyclo
 		if b.Name == "test2" && b.DefaultServer.LogBufsize != nil {
 			t.Errorf("%v: DefaultServer.LogBufsize should be nil: %v", b.Name, b.DefaultServer.LogBufsize)
 		}
+
+		if b.Name == "test" && (b.HashBalanceFactor == nil) {
+			t.Errorf("%v: HashBalanceFactor is nil", b.Name)
+		} else {
+			if b.Name == "test" && *b.HashBalanceFactor != 150 {
+				t.Errorf("%v: HashBalanceFactor not 150: %v", b.Name, *b.HashBalanceFactor)
+			}
+		}
 	}
 }
 
@@ -641,19 +649,30 @@ func TestGetBackend(t *testing.T) {
 		t.Errorf("MaxKeepAliveQueue not 101: %v", *b.MaxKeepAliveQueue)
 	}
 
-	if *b.IgnorePersist.Cond != "if" {
-		t.Errorf("IgnorePersist Cond not if: %v", *b.IgnorePersist.Cond)
-	}
-	if *b.IgnorePersist.CondTest != "acl-name" {
-		t.Errorf("IgnorePersist CondTest not acl-name: %v", *b.IgnorePersist.CondTest)
+	if len(b.IgnorePersistList) != 2 {
+		t.Errorf("IgnorePersistList has %d items, expected 2", len(b.IgnorePersistList))
+	} else if *b.IgnorePersistList[0].Cond != "if" {
+		t.Errorf("IgnorePersistList[0].Cond is %s, expected 'if'", *b.IgnorePersistList[0].Cond)
+	} else if *b.IgnorePersistList[0].CondTest != "acl-name" {
+		t.Errorf("IgnorePersistList[0].CondTest is %s, expected 'acl-name'", *b.IgnorePersistList[0].CondTest)
+	} else if *b.IgnorePersistList[1].Cond != "unless" {
+		t.Errorf("IgnorePersistList[1].Cond is %s, expected 'unless'", *b.IgnorePersistList[1].Cond)
+	} else if *b.IgnorePersistList[1].CondTest != "local_dst" {
+		t.Errorf("IgnorePersistList[1].CondTest is %s, expected 'local_dst'", *b.IgnorePersistList[1].CondTest)
 	}
 
-	if *b.ForcePersist.Cond != "unless" {
-		t.Errorf("ForcePersist Cond not if: %v", *b.ForcePersist.Cond)
+	if len(b.ForcePersistList) != 2 {
+		t.Errorf("ForcePersistList has %d items, expected 2", len(b.ForcePersistList))
+	} else if *b.ForcePersistList[0].Cond != "unless" {
+		t.Errorf("ForcePersistList[0].Cond is %s, expected 'unless'", *b.ForcePersistList[0].Cond)
+	} else if *b.ForcePersistList[0].CondTest != "acl-name-2" {
+		t.Errorf("ForcePersistList[0].CondTest is %s, expected 'acl-name-2'", *b.ForcePersistList[0].CondTest)
+	} else if *b.ForcePersistList[1].Cond != "if" {
+		t.Errorf("ForcePersistList[1].Cond is %s, expected 'if'", *b.ForcePersistList[1].Cond)
+	} else if *b.ForcePersistList[1].CondTest != "acl-name-3" {
+		t.Errorf("ForcePersistList[1].CondTest is %s, expected 'acl-name-3'", *b.ForcePersistList[1].CondTest)
 	}
-	if *b.ForcePersist.CondTest != "acl-name-2" {
-		t.Errorf("ForcePersist CondTest not acl-name-2: %v", *b.ForcePersist.CondTest)
-	}
+
 	if b.RetryOn != "504 505" {
 		t.Errorf("RetryOn CondTest not 504 505: %v", b.RetryOn)
 	}
@@ -936,6 +955,14 @@ func TestCreateEditDeleteBackend(t *testing.T) {
 			Originalto: &models.Originalto{
 				Enabled: misc.StringP("enabled"),
 				Header:  "X-Client-Dst",
+			},
+			ForcePersistList: []*models.ForcePersist{
+				{Cond: misc.StringP("unless"), CondTest: misc.StringP("invalid_src")},
+				{Cond: misc.StringP("if"), CondTest: misc.StringP("auth_ok")},
+			},
+			IgnorePersistList: []*models.IgnorePersist{
+				{Cond: misc.StringP("if"), CondTest: misc.StringP("host_www")},
+				{Cond: misc.StringP("unless"), CondTest: misc.StringP("missing_cl")},
 			},
 		},
 		{
@@ -1253,6 +1280,32 @@ func compareBackends(x, y *models.Backend, t *testing.T) bool { //nolint:gocogni
 	case "":
 		x.HTTPConnectionMode = ""
 	}
+
+	if len(x.ForcePersistList) != len(y.ForcePersistList) {
+		return false
+	}
+	for i := range x.ForcePersistList {
+		if *x.ForcePersistList[i].Cond != *y.ForcePersistList[i].Cond {
+			return false
+		}
+		if *x.ForcePersistList[i].CondTest != *y.ForcePersistList[i].CondTest {
+			return false
+		}
+	}
+	x.ForcePersistList, y.ForcePersistList = nil, nil
+
+	if len(x.IgnorePersistList) != len(y.IgnorePersistList) {
+		return false
+	}
+	for i := range x.IgnorePersistList {
+		if *x.IgnorePersistList[i].Cond != *y.IgnorePersistList[i].Cond {
+			return false
+		}
+		if *x.IgnorePersistList[i].CondTest != *y.IgnorePersistList[i].CondTest {
+			return false
+		}
+	}
+	x.IgnorePersistList, y.IgnorePersistList = nil, nil
 
 	return reflect.DeepEqual(x, y)
 }

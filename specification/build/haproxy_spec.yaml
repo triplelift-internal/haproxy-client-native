@@ -732,13 +732,13 @@ definitions:
           proxy-v2-options:
               items:
                   enum:
-                      - ssl
-                      - cert-cn
-                      - ssl-cipher
-                      - cert-sig
-                      - cert-key
                       - authority
+                      - cert-cn
+                      - cert-key
+                      - cert-sig
                       - crc32c
+                      - ssl
+                      - ssl-cipher
                       - unique-id
                   type: string
               type: array
@@ -1148,6 +1148,8 @@ definitions:
               pattern: ^[^\s]+$
               type: string
               x-display-name: Group
+          h1_accept_payload_with_any_method:
+              type: boolean
           h1_case_adjust:
               items:
                   properties:
@@ -1165,6 +1167,8 @@ definitions:
               x-omitempty: true
           h1_case_adjust_file:
               type: string
+          h1_do_not_close_on_insecure_transfer_encoding:
+              type: boolean
           h2_workaround_bogus_websocket_clients:
               type: boolean
           hard_stop_after:
@@ -1972,14 +1976,14 @@ definitions:
               x-display-name: Accept Invalid HTTP Response
           adv_check:
               enum:
-                  - ssl-hello-chk
-                  - smtpchk
+                  - httpchk
                   - ldap-check
                   - mysql-check
                   - pgsql-check
-                  - tcp-check
                   - redis-check
-                  - httpchk
+                  - smtpchk
+                  - ssl-hello-chk
+                  - tcp-check
               type: string
               x-display-name: Advanced Check
           allbackups:
@@ -2132,6 +2136,9 @@ definitions:
                   - disabled
               type: string
               x-display-name: H1 Adjust Bogus Server
+          hash_balance_factor:
+              type: integer
+              x-nullable: true
           hash_type:
               $ref: '#/definitions/hash_type'
           http-buffer-request:
@@ -2415,9 +2422,6 @@ definitions:
               x-display-name: Unique ID format
           unique_id_header:
               type: string
-              x-dependency:
-                  unique_id_format:
-                      required: true
               x-display-name: Unique ID header
       title: Defaults
       type: object
@@ -2743,9 +2747,6 @@ definitions:
               x-display-name: Unique ID format
           unique_id_header:
               type: string
-              x-dependency:
-                  unique_id_format:
-                      required: true
               x-display-name: Unique ID header
       required:
           - name
@@ -2786,14 +2787,14 @@ definitions:
               x-display-name: Accept Invalid HTTP Response
           adv_check:
               enum:
-                  - ssl-hello-chk
-                  - smtpchk
+                  - httpchk
                   - ldap-check
                   - mysql-check
                   - pgsql-check
-                  - tcp-check
                   - redis-check
-                  - httpchk
+                  - smtpchk
+                  - ssl-hello-chk
+                  - tcp-check
               type: string
               x-display-name: Advanced Check
           allbackups:
@@ -2875,6 +2876,7 @@ definitions:
               type: string
               x-display-name: External Check Path
           force_persist:
+              description: This field is deprecated in favor of force_persist_list, and will be removed in a future release
               properties:
                   cond:
                       enum:
@@ -2892,6 +2894,30 @@ definitions:
                   - cond
                   - cond_test
               type: object
+              x-deprecated: true
+          force_persist_list:
+              items:
+                  properties:
+                      cond:
+                          enum:
+                              - if
+                              - unless
+                          type: string
+                          x-display-name: Condition
+                      cond_test:
+                          type: string
+                          x-dependency:
+                              cond:
+                                  required: true
+                          x-display-name: Condition Test
+                  required:
+                      - cond
+                      - cond_test
+                  type: object
+                  x-go-name: ForcePersist
+              type: array
+              x-go-name: ForcePersistList
+              x-omitempty: true
           forwardfor:
               $ref: '#/definitions/forwardfor'
               x-dependency:
@@ -2912,6 +2938,9 @@ definitions:
                   mode:
                       value: http
               x-display-name: H1 Adjust Bogus Server
+          hash_balance_factor:
+              type: integer
+              x-nullable: true
           hash_type:
               $ref: '#/definitions/hash_type'
           http-buffer-request:
@@ -3043,6 +3072,7 @@ definitions:
               type: integer
               x-nullable: true
           ignore_persist:
+              description: This field is deprecated in favor of ignore_persist_list, and will be removed in a future release
               properties:
                   cond:
                       enum:
@@ -3060,6 +3090,30 @@ definitions:
                   - cond
                   - cond_test
               type: object
+              x-deprecated: true
+          ignore_persist_list:
+              items:
+                  properties:
+                      cond:
+                          enum:
+                              - if
+                              - unless
+                          type: string
+                          x-display-name: Condition
+                      cond_test:
+                          type: string
+                          x-dependency:
+                              cond:
+                                  required: true
+                          x-display-name: Condition Test
+                  required:
+                      - cond
+                      - cond_test
+                  type: object
+                  x-go-name: IgnorePersist
+              type: array
+              x-go-name: IgnorePersistList
+              x-omitempty: true
           independent_streams:
               enum:
                   - enabled
@@ -3785,7 +3839,7 @@ definitions:
                       value: capture
               x-display-name: Capture Len
           capture_sample:
-              pattern: ^[^\s]+$
+              pattern: ^(?:[A-Za-z]+\("([A-Za-z\s]+)"\)|[A-Za-z]+)
               type: string
               x-dependency:
                   type:
@@ -3977,7 +4031,7 @@ definitions:
                   - path-strip-dot
                   - path-strip-dotdot
                   - percent-decode-unreserved
-                  - percent-to-upercase
+                  - percent-to-uppercase
                   - query-sort-by-name
               type: string
               x-dependency:
@@ -3997,7 +4051,7 @@ definitions:
                   normalizer:
                       value:
                           - percent-decode-unreserved
-                          - percent-to-upercase
+                          - percent-to-uppercase
                   type:
                       value: normalize-uri
           path_fmt:
@@ -4143,6 +4197,14 @@ definitions:
                       value: return
               x-display-name: Return Error Code
               x-nullable: true
+          rst_ttl:
+              type: integer
+              x-dependency:
+                  type:
+                      required: true
+                      value:
+                          - silent-drop
+              x-display-name: RST TTL
           sc_expr:
               type: string
               x-dependency:
@@ -4162,6 +4224,7 @@ definitions:
                           - sc-inc-gpc
                           - sc-inc-gpc0
                           - sc-inc-gpc1
+                          - sc-set-gpt
                           - sc-set-gpt0
           sc_idx:
               type: integer
@@ -4171,6 +4234,7 @@ definitions:
                       value:
                           - sc-add-gpc
                           - sc-inc-gpc
+                          - sc-set-gpt
           sc_int:
               type: integer
               x-dependency:
@@ -4338,6 +4402,7 @@ definitions:
                   - sc-inc-gpc
                   - sc-inc-gpc0
                   - sc-inc-gpc1
+                  - sc-set-gpt
                   - sc-set-gpt0
                   - send-spoe-group
                   - set-dst
@@ -4754,6 +4819,14 @@ definitions:
                       value: return
               x-display-name: Return Error Code
               x-nullable: true
+          rst_ttl:
+              type: integer
+              x-dependency:
+                  type:
+                      required: true
+                      value:
+                          - silent-drop
+              x-display-name: RST TTL
           sc_expr:
               type: string
               x-dependency:
@@ -4773,6 +4846,7 @@ definitions:
                           - sc-inc-gpc
                           - sc-inc-gpc0
                           - sc-inc-gpc1
+                          - sc-set-gpt
                           - sc-set-gpt0
           sc_idx:
               type: integer
@@ -4782,6 +4856,7 @@ definitions:
                       value:
                           - sc-add-gpc
                           - sc-inc-gpc
+                          - sc-set-gpt
           sc_int:
               type: integer
               x-dependency:
@@ -4946,6 +5021,7 @@ definitions:
                   - sc-inc-gpc
                   - sc-inc-gpc0
                   - sc-inc-gpc1
+                  - sc-set-gpt
                   - sc-set-gpt0
                   - send-spoe-group
                   - set-header
@@ -5055,6 +5131,27 @@ definitions:
                       value:
                           - del-acl
               x-display-name: ACK Key Format
+          capture_id:
+              type: integer
+              x-dependency:
+                  type:
+                      value: capture
+              x-display-name: Capture SlotID
+              x-nullable: true
+          capture_len:
+              type: integer
+              x-dependency:
+                  type:
+                      required: true
+                      value: capture
+              x-display-name: Capture Len
+          capture_sample:
+              pattern: ^(?:[A-Za-z]+\("([A-Za-z\s]+)"\)|[A-Za-z]+)
+              type: string
+              x-dependency:
+                  type:
+                      value: capture
+              x-display-name: Capture Sample
           cond:
               enum:
                   - if
@@ -5175,6 +5272,7 @@ definitions:
                           - sc-inc-gpc
                           - sc-inc-gpc0
                           - sc-inc-gpc1
+                          - sc-set-gpt
                           - sc-set-gpt0
           sc_idx:
               type: integer
@@ -5184,6 +5282,7 @@ definitions:
                       value:
                           - sc-add-gpc
                           - sc-inc-gpc
+                          - sc-set-gpt
           sc_int:
               type: integer
               x-dependency:
@@ -5221,6 +5320,7 @@ definitions:
               enum:
                   - add-header
                   - allow
+                  - capture
                   - del-acl
                   - del-header
                   - del-map
@@ -5230,12 +5330,14 @@ definitions:
                   - sc-inc-gpc
                   - sc-inc-gpc0
                   - sc-inc-gpc1
+                  - sc-set-gpt
                   - sc-set-gpt0
                   - set-header
                   - set-log-level
                   - set-map
                   - set-status
                   - set-var
+                  - set-var-fmt
                   - strict-mode
                   - unset-var
               type: string
@@ -5247,6 +5349,13 @@ definitions:
                       required: true
                       value: set-var
               x-display-name: Var Expression
+          var_format:
+              type: string
+              x-dependency:
+                  type:
+                      required: true
+                      value: set-var-fmt
+              x-display-name: Var Format
           var_name:
               pattern: ^[^\s]+$
               type: string
@@ -5255,6 +5364,7 @@ definitions:
                       required: true
                       value:
                           - set-var
+                          - set-var-fmt
                           - unset-var
           var_scope:
               pattern: ^[^\s]+$
@@ -5264,6 +5374,7 @@ definitions:
                       required: true
                       value:
                           - set-var
+                          - set-var-fmt
                           - unset-var
       required:
           - index
@@ -5655,34 +5766,36 @@ definitions:
                   - do-resolve
                   - expect-netscaler-cip
                   - expect-proxy
+                  - lua
                   - reject
                   - sc-add-gpc
                   - sc-inc-gpc
                   - sc-inc-gpc0
                   - sc-inc-gpc1
+                  - sc-set-gpt
                   - sc-set-gpt0
                   - send-spoe-group
+                  - set-bandwidth-limit
                   - set-dst-port
                   - set-dst
-                  - set-priority
+                  - set-log-level
+                  - set-mark
+                  - set-nice
+                  - set-priority-class
+                  - set-priority-offset
                   - set-src
+                  - set-src-port
+                  - set-tos
                   - set-var
+                  - set-var-fmt
                   - silent-drop
+                  - switch-mode
                   - track-sc0
                   - track-sc1
                   - track-sc2
                   - track-sc
                   - unset-var
                   - use-service
-                  - lua
-                  - set-bandwidth-limit
-                  - set-src-port
-                  - set-mark
-                  - set-tos
-                  - set-var-fmt
-                  - set-log-level
-                  - set-nice
-                  - switch-mode
               type: string
               x-dependency:
                   type:
@@ -5729,7 +5842,7 @@ definitions:
                           - content
               x-display-name: Capture Length
           capture_sample:
-              pattern: ^[^\s]+$
+              pattern: ^(?:[A-Za-z]+\("([A-Za-z\s]+)"\)|[A-Za-z]+)
               type: string
               x-dependency:
                   action:
@@ -5776,12 +5889,13 @@ definitions:
                       required: true
                       value:
                           - do-resolve
-                          - set-var
-                          - set-src
-                          - set-priority
                           - set-dst
                           - set-dst-port
+                          - set-priority-class
+                          - set-priority-offset
+                          - set-src
                           - set-src-port
+                          - set-var
                   type:
                       value:
                           - session
@@ -5868,18 +5982,6 @@ definitions:
                       value: content
               x-display-name: Nice Value
               x-nullable: false
-          priority_type:
-              enum:
-                  - class
-                  - offset
-              type: string
-              x-dependency:
-                  action:
-                      required: true
-                      value: set-priority
-                  type:
-                      value:
-                          - content
           resolve_protocol:
               enum:
                   - ipv4
@@ -5916,12 +6018,21 @@ definitions:
                       value:
                           - content
               x-display-name: Variable name
+          rst_ttl:
+              type: integer
+              x-dependency:
+                  type:
+                      required: true
+                      value:
+                          - silent-drop
+              x-display-name: RST TTL
           sc_idx:
               type: string
               x-dependency:
                   action:
                       required: true
-                      value: []
+                      value:
+                          - sc-set-gpt
                   type:
                       required: true
                       value:
@@ -5939,6 +6050,7 @@ definitions:
                           - sc-inc-gpc
                           - sc-inc-gpc0
                           - sc-inc-gpc1
+                          - sc-set-gpt
                           - sc-set-gpt0
                   type:
                       required: true
@@ -6090,6 +6202,7 @@ definitions:
                       value: set-var-fmt
                   type:
                       value:
+                          - session
                           - connection
                           - content
               x-display-name: Var Format
@@ -6148,20 +6261,23 @@ definitions:
           action:
               enum:
                   - accept
-                  - reject
-                  - lua
-                  - set-bandwidth-limit
                   - close
+                  - lua
+                  - reject
                   - sc-add-gpc
                   - sc-inc-gpc
                   - sc-inc-gpc0
                   - sc-inc-gpc1
+                  - sc-set-gpt
                   - sc-set-gpt0
                   - send-spoe-group
+                  - set-bandwidth-limit
                   - set-log-level
                   - set-mark
                   - set-nice
                   - set-tos
+                  - set-var
+                  - set-var-fmt
                   - silent-drop
                   - unset-var
               type: string
@@ -6287,6 +6403,14 @@ definitions:
                       value: content
               x-display-name: Nice Value
               x-nullable: false
+          rst_ttl:
+              type: integer
+              x-dependency:
+                  type:
+                      required: true
+                      value:
+                          - silent-drop
+              x-display-name: RST TTL
           sc_expr:
               type: string
               x-dependency:
@@ -6308,6 +6432,7 @@ definitions:
                           - sc-inc-gpc
                           - sc-inc-gpc0
                           - sc-inc-gpc1
+                          - sc-set-gpt
                           - sc-set-gpt0
                   type:
                       value: content
@@ -6318,6 +6443,7 @@ definitions:
                       required: true
                       value:
                           - sc-add-gpc
+                          - sc-set-gpt
                           - sc-inc-gpc
                   type:
                       value: content
@@ -6376,6 +6502,15 @@ definitions:
                   - inspect-delay
               type: string
               x-nullable: false
+          var_format:
+              type: string
+              x-dependency:
+                  action:
+                      required: true
+                      value: set-var-fmt
+                  type:
+                      value: content
+              x-display-name: Var Format
           var_name:
               pattern: ^[^\s]+$
               type: string
@@ -6899,13 +7034,13 @@ definitions:
               x-display-name: Trace Random Parsing
           type:
               enum:
-                  - trace
-                  - compression
-                  - spoe
-                  - cache
-                  - fcgi-app
                   - bwlim-in
                   - bwlim-out
+                  - cache
+                  - compression
+                  - fcgi-app
+                  - spoe
+                  - trace
               type: string
               x-nullable: false
       required:
@@ -7477,6 +7612,11 @@ definitions:
                   type:
                       - frontend
                       - backend
+              x-nullable: true
+          last_agt:
+              type: string
+              x-dependency:
+                  type: server
               x-nullable: true
           last_chk:
               type: string
@@ -8400,13 +8540,13 @@ definitions:
           proxy-v2-options:
               items:
                   enum:
-                      - ssl
-                      - cert-cn
-                      - ssl-cipher
-                      - cert-sig
-                      - cert-key
                       - authority
+                      - cert-cn
+                      - cert-key
+                      - cert-sig
                       - crc32c
+                      - ssl
+                      - ssl-cipher
                       - unique-id
                   type: string
               type: array
@@ -8578,25 +8718,25 @@ definitions:
                   properties:
                       field:
                           enum:
-                              - server_id
+                              - bytes_in_cnt
+                              - bytes_in_rate
+                              - bytes_out_cnt
+                              - bytes_out_rate
+                              - conn_cnt
+                              - conn_cur
+                              - conn_rate
                               - gpc0
                               - gpc0_rate
                               - gpc1
                               - gpc1_rate
                               - gpt0
-                              - conn_cnt
-                              - conn_cur
-                              - conn_rate
-                              - sess_cnt
-                              - sess_rate
                               - http_req_cnt
                               - http_req_rate
                               - http_err_cnt
                               - http_err_rate
-                              - bytes_in_cnt
-                              - bytes_in_rate
-                              - bytes_out_cnt
-                              - bytes_out_rate
+                              - server_id
+                              - sess_cnt
+                              - sess_rate
                           type: string
                       period:
                           type: integer
@@ -8983,17 +9123,17 @@ definitions:
       properties:
           algorithm:
               enum:
-                  - roundrobin
-                  - static-rr
-                  - leastconn
                   - first
-                  - source
-                  - uri
-                  - url_param
+                  - hash
                   - hdr
+                  - leastconn
                   - random
                   - rdp-cookie
-                  - hash
+                  - roundrobin
+                  - source
+                  - static-rr
+                  - uri
+                  - url_param
               type: string
           hash_expression:
               type: string
@@ -9804,14 +9944,14 @@ definitions:
                       x-display-name: Condition Test
                   name:
                       enum:
-                          - on-client-session
-                          - on-server-session
-                          - on-frontend-tcp-request
-                          - on-backend-tcp-request
-                          - on-tcp-response
-                          - on-frontend-http-request
                           - on-backend-http-request
+                          - on-backend-tcp-request
+                          - on-client-session
+                          - on-frontend-http-request
+                          - on-frontend-tcp-request
                           - on-http-response
+                          - on-server-session
+                          - on-tcp-response
                       type: string
               required:
                   - name

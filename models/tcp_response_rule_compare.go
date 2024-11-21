@@ -85,6 +85,10 @@ func (s TCPResponseRule) Equal(t TCPResponseRule, opts ...Options) bool {
 		return false
 	}
 
+	if s.RstTTL != t.RstTTL {
+		return false
+	}
+
 	if s.ScExpr != t.ScExpr {
 		return false
 	}
@@ -118,6 +122,10 @@ func (s TCPResponseRule) Equal(t TCPResponseRule, opts ...Options) bool {
 	}
 
 	if s.Type != t.Type {
+		return false
+	}
+
+	if s.VarFormat != t.VarFormat {
 		return false
 	}
 
@@ -201,6 +209,10 @@ func (s TCPResponseRule) Diff(t TCPResponseRule, opts ...Options) map[string][]i
 		diff["NiceValue"] = []interface{}{s.NiceValue, t.NiceValue}
 	}
 
+	if s.RstTTL != t.RstTTL {
+		diff["RstTTL"] = []interface{}{s.RstTTL, t.RstTTL}
+	}
+
 	if s.ScExpr != t.ScExpr {
 		diff["ScExpr"] = []interface{}{s.ScExpr, t.ScExpr}
 	}
@@ -235,6 +247,10 @@ func (s TCPResponseRule) Diff(t TCPResponseRule, opts ...Options) map[string][]i
 
 	if s.Type != t.Type {
 		diff["Type"] = []interface{}{s.Type, t.Type}
+	}
+
+	if s.VarFormat != t.VarFormat {
+		diff["VarFormat"] = []interface{}{s.VarFormat, t.VarFormat}
 	}
 
 	if s.VarName != t.VarName {

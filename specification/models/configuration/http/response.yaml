@@ -31,6 +31,7 @@ http_response_rule:
         - sc-inc-gpc
         - sc-inc-gpc0
         - sc-inc-gpc1
+        - sc-set-gpt
         - sc-set-gpt0
         - send-spoe-group
         - set-header
@@ -118,7 +119,8 @@ http_response_rule:
       x-display-name: Header Name
       x-dependency:
         type:
-          value: [add-header, replace-header, del-header, set-header, replace-value]
+          value:
+            [add-header, replace-header, del-header, set-header, replace-value]
           required: true
     hdr_match:
       type: string
@@ -146,6 +148,13 @@ http_response_rule:
       x-dependency:
         type:
           value: set-log-level
+          required: true
+    rst_ttl:
+      type: integer
+      x-display-name: RST TTL
+      x-dependency:
+        type:
+          value: [silent-drop]
           required: true
     var_name:
       type: string
@@ -245,13 +254,21 @@ http_response_rule:
       type: integer
       x-dependency:
         type:
-          value: [sc-add-gpc, sc-inc-gpc, sc-inc-gpc0, sc-inc-gpc1, sc-set-gpt0]
+          value:
+            [
+              sc-add-gpc,
+              sc-inc-gpc,
+              sc-inc-gpc0,
+              sc-inc-gpc1,
+              sc-set-gpt,
+              sc-set-gpt0,
+            ]
           required: true
     sc_idx:
       type: integer
       x-dependency:
         type:
-          value: [sc-add-gpc, sc-inc-gpc]
+          value: [sc-add-gpc, sc-inc-gpc, sc-set-gpt]
           required: true
     sc_expr:
       type: string
@@ -270,7 +287,7 @@ http_response_rule:
           required: true
     mark_value:
       type: string
-      pattern: '^(0x[0-9A-Fa-f]+|[0-9]+)$'
+      pattern: "^(0x[0-9A-Fa-f]+|[0-9]+)$"
       x-display-name: Mark Value
       x-dependency:
         type:
@@ -288,7 +305,7 @@ http_response_rule:
           required: true
     tos_value:
       type: string
-      pattern: '^(0x[0-9A-Fa-f]+|[0-9]+)$'
+      pattern: "^(0x[0-9A-Fa-f]+|[0-9]+)$"
       x-display-name: Tos Value
       x-dependency:
         type:
@@ -369,7 +386,7 @@ http_response_rule:
           value: track-sc
     strict_mode:
       type: string
-      enum: ['on', 'off']
+      enum: ["on", "off"]
       x-dependency:
         type:
           value: strict-mode
@@ -420,7 +437,16 @@ http_response_rule:
       x-nullable: true
     return_content_format:
       type: string
-      enum: [default-errorfiles, errorfile, errorfiles, file, lf-file, string, lf-string]
+      enum:
+        [
+          default-errorfiles,
+          errorfile,
+          errorfiles,
+          file,
+          lf-file,
+          string,
+          lf-string,
+        ]
       x-dependency:
         type:
           value: [deny, return]

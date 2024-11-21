@@ -16,29 +16,26 @@
 package runtime
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/pkg/errors"
-
 	native_errors "github.com/haproxytech/client-native/v5/errors"
 	"github.com/haproxytech/client-native/v5/misc"
 	"github.com/haproxytech/client-native/v5/models"
 	"github.com/haproxytech/client-native/v5/runtime/options"
+	"github.com/pkg/errors"
+	"golang.org/x/sync/singleflight"
 )
 
 // Client handles multiple HAProxy clients
 type client struct {
-	haproxyVersion *HAProxyVersion
-	options        options.RuntimeOptions
-	runtimes       []SingleRuntime
+	options  options.RuntimeOptions
+	runtimes []*SingleRuntime
 }
 
 const (
@@ -49,11 +46,12 @@ const (
 	maxBufSize = 8192
 )
 
-func (c *client) initWithSockets(ctx context.Context, socketPath map[int]string) error {
-	c.runtimes = make([]SingleRuntime, 0)
+func (c *client) initWithSockets(opt options.RuntimeOptions) error {
+	socketPath := opt.Sockets
+	c.runtimes = make([]*SingleRuntime, 0)
 	for process, path := range socketPath {
-		runtime := SingleRuntime{}
-		err := runtime.Init(ctx, path, 0, process)
+		runtime := &SingleRuntime{}
+		err := runtime.Init(path, 0, process, opt)
 		if err != nil {
 			return err
 		}
@@ -63,17 +61,19 @@ func (c *client) initWithSockets(ctx context.Context, socketPath map[int]string)
 	return nil
 }
 
-func (c *client) initWithMasterSocket(ctx context.Context, masterSocketPath string, nbproc int) error {
+func (c *client) initWithMasterSocket(opt options.RuntimeOptions) error {
+	masterSocketPath := opt.MasterSocketData.MasterSocketPath
+	nbproc := c.options.MasterSocketData.Nbproc
 	if nbproc == 0 {
 		nbproc = 1
 	}
 	if masterSocketPath == "" {
 		return fmt.Errorf("master socket not configured")
 	}
-	c.runtimes = make([]SingleRuntime, nbproc)
+	c.runtimes = make([]*SingleRuntime, nbproc)
 	for i := 1; i <= nbproc; i++ {
-		runtime := SingleRuntime{}
-		err := runtime.Init(ctx, masterSocketPath, i, i)
+		runtime := &SingleRuntime{}
+		err := runtime.Init(masterSocketPath, i, i, opt)
 		if err != nil {
 			return err
 		}
@@ -102,44 +102,53 @@ func (c *client) GetInfo() (models.ProcessInfos, error) {
 	return result, nil
 }
 
-var versionSync sync.Once //nolint:gochecknoglobals
+var (
+	haproxyVersion *HAProxyVersion        //nolint:gochecknoglobals
+	versionKey     = "version"            //nolint:gochecknoglobals
+	versionSfg     = singleflight.Group{} //nolint:gochecknoglobals
+)
 
 // GetVersion returns info from the socket
 func (c *client) GetVersion() (HAProxyVersion, error) {
 	var err error
-	versionSync.Do(func() {
+	if haproxyVersion != nil {
+		return *haproxyVersion, nil
+	}
+	_, err, _ = versionSfg.Do(versionKey, func() (interface{}, error) {
 		version := &HAProxyVersion{}
 		for _, runtime := range c.runtimes {
 			var response string
 			response, err = runtime.ExecuteRaw("show info")
 			if err != nil {
-				return
+				return HAProxyVersion{}, err
 			}
 			for _, line := range strings.Split(response, "\n") {
 				if strings.HasPrefix(line, "Version: ") {
 					err = version.ParseHAProxyVersion(strings.TrimPrefix(line, "Version: "))
 					if err != nil {
-						return
+						return HAProxyVersion{}, err
 					}
-					c.haproxyVersion = version
-					return
+					haproxyVersion = version
+					return haproxyVersion, nil
 				}
 			}
 		}
-		err = fmt.Errorf("version data not found")
+		err = errors.New("version data not found")
+		return HAProxyVersion{}, err // it's dereferenced in IsVersionBiggerOrEqual
 	})
 	if err != nil {
 		return HAProxyVersion{}, err
 	}
 
-	if c.haproxyVersion == nil {
-		return HAProxyVersion{}, fmt.Errorf("version data not found")
+	if haproxyVersion == nil {
+		return HAProxyVersion{}, errors.New("version data not found")
 	}
-	return *c.haproxyVersion, err
+
+	return *haproxyVersion, err
 }
 
 func (c *client) IsVersionBiggerOrEqual(minimumVersion *HAProxyVersion) bool {
-	return IsBiggerOrEqual(minimumVersion, c.haproxyVersion)
+	return IsBiggerOrEqual(minimumVersion, haproxyVersion)
 }
 
 // Reloads HAProxy's configuration file. Similar to SIGUSR2. Returns the startup logs.
@@ -150,7 +159,7 @@ func (c *client) Reload() (string, error) {
 		return "", fmt.Errorf("cannot reload: not connected to a master socket")
 	}
 	if !c.IsVersionBiggerOrEqual(&HAProxyVersion{Major: 2, Minor: 7}) {
-		return "", fmt.Errorf("cannot reload: requires HAProxy 2.7 or later")
+		return "", fmt.Errorf("cannot reload: requires HAProxy 2.7 or later but current version is %v", haproxyVersion)
 	}
 
 	for _, runtime := range c.runtimes {
@@ -227,7 +236,7 @@ func (c *client) AddServer(backend, name, attributes string) error {
 		return fmt.Errorf("no valid runtimes found")
 	}
 	if !c.IsVersionBiggerOrEqual(&HAProxyVersion{Major: 2, Minor: 6}) {
-		return fmt.Errorf("this operation requires HAProxy 2.6 or later")
+		return fmt.Errorf("this operation requires HAProxy 2.6 or later but current version is %v", haproxyVersion)
 	}
 	for _, runtime := range c.runtimes {
 		err := runtime.AddServer(backend, name, attributes)
@@ -1188,6 +1197,91 @@ func (c *client) CommitACL(version, name string) error {
 	var lastErr error
 	for _, runtime := range c.runtimes {
 		if err := runtime.CommitACL(version, name); err != nil {
+			lastErr = err
+		}
+	}
+	if lastErr != nil {
+		return lastErr
+	}
+	return nil
+}
+
+func (c *client) NewCertEntry(filename string) error {
+	if len(c.runtimes) == 0 {
+		return fmt.Errorf("no valid runtimes found")
+	}
+	var lastErr error
+	for _, runtime := range c.runtimes {
+		err := runtime.NewCertEntry(filename)
+		if err != nil {
+			lastErr = err
+		}
+	}
+	if lastErr != nil {
+		return lastErr
+	}
+	return nil
+}
+
+func (c *client) SetCertEntry(filename string, payload string) error {
+	if len(c.runtimes) == 0 {
+		return fmt.Errorf("no valid runtimes found")
+	}
+	var lastErr error
+	for _, runtime := range c.runtimes {
+		err := runtime.SetCertEntry(filename, payload)
+		if err != nil {
+			lastErr = err
+		}
+	}
+	if lastErr != nil {
+		return lastErr
+	}
+	return nil
+}
+
+func (c *client) CommitCertEntry(filename string) error {
+	if len(c.runtimes) == 0 {
+		return fmt.Errorf("no valid runtimes found")
+	}
+	var lastErr error
+	for _, runtime := range c.runtimes {
+		err := runtime.CommitCertEntry(filename)
+		if err != nil {
+			lastErr = err
+		}
+	}
+	if lastErr != nil {
+		return lastErr
+	}
+	return nil
+}
+
+func (c *client) AbortCertEntry(filename string) error {
+	if len(c.runtimes) == 0 {
+		return fmt.Errorf("no valid runtimes found")
+	}
+	var lastErr error
+	for _, runtime := range c.runtimes {
+		err := runtime.AbortCertEntry(filename)
+		if err != nil {
+			lastErr = err
+		}
+	}
+	if lastErr != nil {
+		return lastErr
+	}
+	return nil
+}
+
+func (c *client) AddCrtListEntry(crtList string, entry CrtListEntry) error {
+	if len(c.runtimes) == 0 {
+		return fmt.Errorf("no valid runtimes found")
+	}
+	var lastErr error
+	for _, runtime := range c.runtimes {
+		err := runtime.AddCrtListEntry(crtList, entry)
+		if err != nil {
 			lastErr = err
 		}
 	}

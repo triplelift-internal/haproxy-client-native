@@ -17,17 +17,16 @@ package configuration
 
 import (
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/go-openapi/strfmt"
-	parser "github.com/haproxytech/config-parser/v5"
-	"github.com/haproxytech/config-parser/v5/common"
-	parser_errors "github.com/haproxytech/config-parser/v5/errors"
-	"github.com/haproxytech/config-parser/v5/parsers/actions"
-	http_actions "github.com/haproxytech/config-parser/v5/parsers/http/actions"
-	"github.com/haproxytech/config-parser/v5/types"
+	parser "github.com/haproxytech/client-native/v5/config-parser"
+	"github.com/haproxytech/client-native/v5/config-parser/common"
+	parser_errors "github.com/haproxytech/client-native/v5/config-parser/errors"
+	"github.com/haproxytech/client-native/v5/config-parser/parsers/actions"
+	http_actions "github.com/haproxytech/client-native/v5/config-parser/parsers/http/actions"
+	"github.com/haproxytech/client-native/v5/config-parser/types"
 
 	"github.com/haproxytech/client-native/v5/misc"
 	"github.com/haproxytech/client-native/v5/models"
@@ -223,7 +222,7 @@ func ParseHTTPRequestRules(t, pName string, p parser.Parser) (models.HTTPRequest
 	return httpReqRules, nil
 }
 
-func ParseHTTPRequestRule(f types.Action) (rule *models.HTTPRequestRule, err error) { //nolint:gocyclo,cyclop,maintidx
+func ParseHTTPRequestRule(f types.Action) (rule *models.HTTPRequestRule, err error) { //nolint:gocyclo,cyclop,maintidx,gocognit
 	switch v := f.(type) {
 	case *http_actions.AddACL:
 		rule = &models.HTTPRequestRule{
@@ -302,6 +301,10 @@ func ParseHTTPRequestRule(f types.Action) (rule *models.HTTPRequestRule, err err
 			CondTest:  v.CondTest,
 		}
 	case *http_actions.Deny:
+		var returnContentTypePtr *string
+		if v.ContentType != "" {
+			returnContentTypePtr = &v.ContentType
+		}
 		rule = &models.HTTPRequestRule{
 			Type:                "deny",
 			Cond:                v.Cond,
@@ -309,7 +312,7 @@ func ParseHTTPRequestRule(f types.Action) (rule *models.HTTPRequestRule, err err
 			ReturnHeaders:       actionHdr2ModelHdr(v.Hdrs),
 			ReturnContent:       v.Content,
 			ReturnContentFormat: v.ContentFormat,
-			ReturnContentType:   &v.ContentType,
+			ReturnContentType:   returnContentTypePtr,
 			DenyStatus:          v.Status,
 		}
 	case *http_actions.DisableL7Retry:
@@ -419,13 +422,17 @@ func ParseHTTPRequestRule(f types.Action) (rule *models.HTTPRequestRule, err err
 			CondTest:  v.CondTest,
 		}
 	case *http_actions.Return:
+		var returnContentTypePtr *string
+		if v.ContentType != "" {
+			returnContentTypePtr = &v.ContentType
+		}
 		rule = &models.HTTPRequestRule{
 			Cond:                v.Cond,
 			CondTest:            v.CondTest,
 			ReturnHeaders:       actionHdr2ModelHdr(v.Hdrs),
 			ReturnContent:       v.Content,
 			ReturnContentFormat: v.ContentFormat,
-			ReturnContentType:   &v.ContentType,
+			ReturnContentType:   returnContentTypePtr,
 			ReturnStatusCode:    v.Status,
 			Type:                "return",
 		}
@@ -470,6 +477,26 @@ func ParseHTTPRequestRule(f types.Action) (rule *models.HTTPRequestRule, err err
 		rule = &models.HTTPRequestRule{
 			Type:     "sc-inc-gpc1",
 			ScID:     ID,
+			Cond:     v.Cond,
+			CondTest: v.CondTest,
+		}
+	case *actions.ScSetGpt:
+		if v.Int == nil && len(v.Expr.Expr) == 0 {
+			return nil, NewConfError(ErrValidationError, "sc-set-gpt: int or expr has to be set")
+		}
+		if v.Int != nil && len(v.Expr.Expr) > 0 {
+			return nil, NewConfError(ErrValidationError, "sc-set-gpt: int and expr are exclusive")
+		}
+		scID, errp := strconv.ParseInt(v.ScID, 10, 64)
+		if errp != nil {
+			return nil, NewConfError(ErrValidationError, "sc-set-gpt: failed to parse sc-id an an int")
+		}
+		rule = &models.HTTPRequestRule{
+			Type:     "sc-set-gpt",
+			ScID:     scID,
+			ScIdx:    v.Idx,
+			ScExpr:   strings.Join(v.Expr.Expr, " "),
+			ScInt:    v.Int,
 			Cond:     v.Cond,
 			CondTest: v.CondTest,
 		}
@@ -648,6 +675,7 @@ func ParseHTTPRequestRule(f types.Action) (rule *models.HTTPRequestRule, err err
 		}
 	case *actions.SilentDrop:
 		rule = &models.HTTPRequestRule{
+			RstTTL:   v.RstTTL,
 			Type:     "silent-drop",
 			Cond:     v.Cond,
 			CondTest: v.CondTest,
@@ -953,6 +981,21 @@ func SerializeHTTPRequestRule(f models.HTTPRequestRule) (rule types.Action, err 
 			Cond:     f.Cond,
 			CondTest: f.CondTest,
 		}
+	case "sc-set-gpt":
+		if len(f.ScExpr) > 0 && f.ScInt != nil {
+			return nil, NewConfError(ErrValidationError, "sc-set-gpt: int and expr are exclusive")
+		}
+		if len(f.ScExpr) == 0 && f.ScInt == nil {
+			return nil, NewConfError(ErrValidationError, "sc-set-gpt: int or expr has to be set")
+		}
+		rule = &actions.ScSetGpt{
+			ScID:     strconv.FormatInt(f.ScID, 10),
+			Idx:      f.ScIdx,
+			Int:      f.ScInt,
+			Expr:     common.Expression{Expr: strings.Split(f.ScExpr, " ")},
+			Cond:     f.Cond,
+			CondTest: f.CondTest,
+		}
 	case "sc-set-gpt0":
 		if len(f.ScExpr) > 0 && f.ScInt != nil {
 			return nil, NewConfError(ErrValidationError, "sc-set-gpt0 int and expr are exclusive")
@@ -1104,6 +1147,7 @@ func SerializeHTTPRequestRule(f models.HTTPRequestRule) (rule types.Action, err 
 		}
 	case "silent-drop":
 		rule = &actions.SilentDrop{
+			RstTTL:   f.RstTTL,
 			Cond:     f.Cond,
 			CondTest: f.CondTest,
 		}
@@ -1172,12 +1216,17 @@ func SerializeHTTPRequestRule(f models.HTTPRequestRule) (rule types.Action, err 
 			CondTest: f.CondTest,
 		}
 	case "wait-for-body":
-		rule = &http_actions.WaitForBody{
-			Time:     fmt.Sprintf("%v", f.WaitTime),
-			AtLeast:  fmt.Sprintf("%v", f.WaitAtLeast),
+		r := &http_actions.WaitForBody{
 			Cond:     f.Cond,
 			CondTest: f.CondTest,
 		}
+		if f.WaitTime != nil {
+			r.Time = strconv.FormatInt(*f.WaitTime, 10)
+		}
+		if f.WaitAtLeast != nil {
+			r.AtLeast = strconv.FormatInt(*f.WaitAtLeast, 10)
+		}
+		rule = r
 	case "wait-for-handshake":
 		rule = &http_actions.WaitForHandshake{
 			Cond:     f.Cond,

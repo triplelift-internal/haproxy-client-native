@@ -22,12 +22,12 @@ import (
 	"strings"
 
 	strfmt "github.com/go-openapi/strfmt"
-	parser "github.com/haproxytech/config-parser/v5"
-	"github.com/haproxytech/config-parser/v5/common"
-	parser_errors "github.com/haproxytech/config-parser/v5/errors"
-	"github.com/haproxytech/config-parser/v5/parsers/actions"
-	http_actions "github.com/haproxytech/config-parser/v5/parsers/http/actions"
-	"github.com/haproxytech/config-parser/v5/types"
+	parser "github.com/haproxytech/client-native/v5/config-parser"
+	"github.com/haproxytech/client-native/v5/config-parser/common"
+	parser_errors "github.com/haproxytech/client-native/v5/config-parser/errors"
+	"github.com/haproxytech/client-native/v5/config-parser/parsers/actions"
+	http_actions "github.com/haproxytech/client-native/v5/config-parser/parsers/http/actions"
+	"github.com/haproxytech/client-native/v5/config-parser/types"
 
 	"github.com/haproxytech/client-native/v5/misc"
 	"github.com/haproxytech/client-native/v5/models"
@@ -384,6 +384,23 @@ func ParseHTTPResponseRule(f types.Action) *models.HTTPResponseRule { //nolint:m
 			Cond:     v.Cond,
 			CondTest: v.CondTest,
 		}
+	case *actions.ScSetGpt:
+		if (v.Int == nil && len(v.Expr.Expr) == 0) || (v.Int != nil && len(v.Expr.Expr) > 0) {
+			return nil
+		}
+		scID, err := strconv.ParseInt(v.ScID, 10, 64)
+		if err != nil {
+			return nil
+		}
+		return &models.HTTPResponseRule{
+			Type:     "sc-set-gpt",
+			ScID:     scID,
+			ScIdx:    v.Idx,
+			ScExpr:   strings.Join(v.Expr.Expr, " "),
+			ScInt:    v.Int,
+			Cond:     v.Cond,
+			CondTest: v.CondTest,
+		}
 	case *actions.ScSetGpt0:
 		if (v.Int == nil && len(v.Expr.Expr) == 0) || (v.Int != nil && len(v.Expr.Expr) > 0) {
 			return nil
@@ -491,6 +508,7 @@ func ParseHTTPResponseRule(f types.Action) *models.HTTPResponseRule { //nolint:m
 		}
 	case *actions.SilentDrop:
 		return &models.HTTPResponseRule{
+			RstTTL:   v.RstTTL,
 			Type:     "silent-drop",
 			Cond:     v.Cond,
 			CondTest: v.CondTest,
@@ -538,7 +556,7 @@ func ParseHTTPResponseRule(f types.Action) *models.HTTPResponseRule { //nolint:m
 	return nil
 }
 
-func SerializeHTTPResponseRule(f models.HTTPResponseRule) (rule types.Action, err error) { //nolint:gocyclo,ireturn,cyclop,maintidx
+func SerializeHTTPResponseRule(f models.HTTPResponseRule) (rule types.Action, err error) { //nolint:gocyclo,ireturn,cyclop,maintidx,gocognit
 	switch f.Type {
 	case "add-acl":
 		rule = &http_actions.AddACL{
@@ -693,6 +711,21 @@ func SerializeHTTPResponseRule(f models.HTTPResponseRule) (rule types.Action, er
 			Cond:     f.Cond,
 			CondTest: f.CondTest,
 		}
+	case "sc-set-gpt":
+		if len(f.ScExpr) > 0 && f.ScInt != nil {
+			return nil, NewConfError(ErrValidationError, "sc-set-gpt: int and expr are exclusive")
+		}
+		if len(f.ScExpr) == 0 && f.ScInt == nil {
+			return nil, NewConfError(ErrValidationError, "sc-set-gpt: int or expr has to be set")
+		}
+		rule = &actions.ScSetGpt{
+			ScID:     strconv.FormatInt(f.ScID, 10),
+			Idx:      f.ScIdx,
+			Int:      f.ScInt,
+			Expr:     common.Expression{Expr: strings.Split(f.ScExpr, " ")},
+			Cond:     f.Cond,
+			CondTest: f.CondTest,
+		}
 	case "sc-set-gpt0":
 		if len(f.ScExpr) > 0 && f.ScInt != nil {
 			return nil, NewConfError(ErrValidationError, "sc-set-gpt0 int and expr are exclusive")
@@ -785,6 +818,7 @@ func SerializeHTTPResponseRule(f models.HTTPResponseRule) (rule types.Action, er
 		}
 	case "silent-drop":
 		rule = &actions.SilentDrop{
+			RstTTL:   f.RstTTL,
 			Cond:     f.Cond,
 			CondTest: f.CondTest,
 		}
