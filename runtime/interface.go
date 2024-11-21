@@ -136,6 +136,14 @@ type Raw interface {
 	ExecuteRaw(command string) ([]string, error)
 }
 
+type Cert interface {
+	NewCertEntry(filename string) error
+	SetCertEntry(filename, payload string) error
+	CommitCertEntry(filename string) error
+	AbortCertEntry(filename string) error
+	AddCrtListEntry(crtList string, entry CrtListEntry) error
+}
+
 type Runtime interface {
 	Info
 	Frontend
@@ -145,6 +153,7 @@ type Runtime interface {
 	ACLs
 	Tables
 	Raw
+	Cert
 }
 
 func New(_ context.Context, opt ...options.RuntimeOption) (Runtime, error) {
