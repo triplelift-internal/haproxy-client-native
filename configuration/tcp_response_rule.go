@@ -21,13 +21,13 @@ import (
 	"strings"
 
 	"github.com/go-openapi/strfmt"
-	parser "github.com/haproxytech/config-parser/v5"
-	"github.com/haproxytech/config-parser/v5/common"
-	parser_errors "github.com/haproxytech/config-parser/v5/errors"
-	"github.com/haproxytech/config-parser/v5/parsers/actions"
-	tcp_actions "github.com/haproxytech/config-parser/v5/parsers/tcp/actions"
-	tcp_types "github.com/haproxytech/config-parser/v5/parsers/tcp/types"
-	"github.com/haproxytech/config-parser/v5/types"
+	parser "github.com/haproxytech/client-native/v5/config-parser"
+	"github.com/haproxytech/client-native/v5/config-parser/common"
+	parser_errors "github.com/haproxytech/client-native/v5/config-parser/errors"
+	"github.com/haproxytech/client-native/v5/config-parser/parsers/actions"
+	tcp_actions "github.com/haproxytech/client-native/v5/config-parser/parsers/tcp/actions"
+	tcp_types "github.com/haproxytech/client-native/v5/config-parser/parsers/tcp/types"
+	"github.com/haproxytech/client-native/v5/config-parser/types"
 
 	"github.com/haproxytech/client-native/v5/misc"
 	"github.com/haproxytech/client-native/v5/models"
@@ -187,6 +187,7 @@ func ParseTCPResponseRules(backend string, p parser.Parser) (models.TCPResponseR
 	return tcpResRules, nil
 }
 
+//nolint:maintidx,gocognit
 func ParseTCPResponseRule(t types.TCPType) (*models.TCPResponseRule, error) {
 	switch v := t.(type) {
 	case *tcp_types.InspectDelay:
@@ -238,10 +239,10 @@ func ParseTCPResponseRule(t types.TCPType) (*models.TCPResponseRule, error) {
 			}, nil
 		case *actions.ScAddGpc:
 			if a.Int == nil && len(a.Expr.Expr) == 0 {
-				return nil, NewConfError(ErrValidationError, "sc-set-gpt0 int or expr has to be set")
+				return nil, NewConfError(ErrValidationError, "sc-add-gpc int or expr has to be set")
 			}
 			if a.Int != nil && len(a.Expr.Expr) > 0 {
-				return nil, NewConfError(ErrValidationError, "sc-set-gpt0 int and expr are exclusive")
+				return nil, NewConfError(ErrValidationError, "sc-add-gpc int and expr are exclusive")
 			}
 			ID, _ := strconv.ParseInt(a.ID, 10, 64)
 			Idx, _ := strconv.ParseInt(a.Idx, 10, 64)
@@ -281,6 +282,27 @@ func ParseTCPResponseRule(t types.TCPType) (*models.TCPResponseRule, error) {
 				Type:     models.TCPResponseRuleTypeContent,
 				Action:   models.TCPResponseRuleActionScDashIncDashGpc1,
 				ScID:     ID,
+				Cond:     a.Cond,
+				CondTest: a.CondTest,
+			}, nil
+		case *actions.ScSetGpt:
+			if a.Int == nil && len(a.Expr.Expr) == 0 {
+				return nil, NewConfError(ErrValidationError, "sc-set-gpt: int or expr has to be set")
+			}
+			if a.Int != nil && len(a.Expr.Expr) > 0 {
+				return nil, NewConfError(ErrValidationError, "sc-set-gpt: int and expr are exclusive")
+			}
+			scID, err := strconv.ParseInt(a.ScID, 10, 64)
+			if err != nil {
+				return nil, NewConfError(ErrValidationError, "sc-set-gpt: failed to parse sc-id as an int")
+			}
+			return &models.TCPResponseRule{
+				Type:     models.TCPResponseRuleTypeContent,
+				Action:   models.TCPResponseRuleActionScDashSetDashGpt,
+				ScID:     scID,
+				ScIdx:    a.Idx,
+				Expr:     strings.Join(a.Expr.Expr, " "),
+				ScInt:    a.Int,
 				Cond:     a.Cond,
 				CondTest: a.CondTest,
 			}, nil
@@ -350,8 +372,27 @@ func ParseTCPResponseRule(t types.TCPType) (*models.TCPResponseRule, error) {
 			return &models.TCPResponseRule{
 				Type:     models.TCPResponseRuleTypeContent,
 				Action:   models.TCPResponseRuleActionSilentDashDrop,
+				RstTTL:   a.RstTTL,
 				Cond:     a.Cond,
 				CondTest: a.CondTest,
+			}, nil
+		case *actions.SetVar:
+			return &models.TCPResponseRule{
+				Action:   models.TCPResponseRuleActionSetDashVar,
+				VarScope: a.VarScope,
+				VarName:  a.VarName,
+				Expr:     a.Expr.String(),
+				Cond:     a.Cond,
+				CondTest: a.CondTest,
+			}, nil
+		case *actions.SetVarFmt:
+			return &models.TCPResponseRule{
+				Action:    models.TCPResponseRuleActionSetDashVarDashFmt,
+				VarName:   a.VarName,
+				VarFormat: strings.Join(a.Fmt.Expr, " "),
+				VarScope:  a.VarScope,
+				Cond:      a.Cond,
+				CondTest:  a.CondTest,
 			}, nil
 		case *actions.UnsetVar:
 			return &models.TCPResponseRule{
@@ -367,7 +408,7 @@ func ParseTCPResponseRule(t types.TCPType) (*models.TCPResponseRule, error) {
 	return nil, NewConfError(ErrValidationError, "invalid action")
 }
 
-func SerializeTCPResponseRule(t models.TCPResponseRule) (types.TCPType, error) {
+func SerializeTCPResponseRule(t models.TCPResponseRule) (types.TCPType, error) { //nolint:maintidx
 	switch t.Type {
 	case models.TCPResponseRuleTypeContent:
 		switch t.Action {
@@ -413,10 +454,10 @@ func SerializeTCPResponseRule(t models.TCPResponseRule) (types.TCPType, error) {
 			}, nil
 		case models.TCPResponseRuleActionScDashAddDashGpc:
 			if len(t.Expr) > 0 && t.ScInt != nil {
-				return nil, NewConfError(ErrValidationError, "sc-set-gpt0 int and expr are exclusive")
+				return nil, NewConfError(ErrValidationError, "sc-add-gpc int and expr are exclusive")
 			}
 			if len(t.Expr) == 0 && t.ScInt == nil {
-				return nil, NewConfError(ErrValidationError, "sc-set-gpt0 int or expr has to be set")
+				return nil, NewConfError(ErrValidationError, "sc-add-gpc int or expr has to be set")
 			}
 			return &tcp_types.Content{
 				Action: &actions.ScAddGpc{
@@ -449,6 +490,23 @@ func SerializeTCPResponseRule(t models.TCPResponseRule) (types.TCPType, error) {
 			return &tcp_types.Content{
 				Action: &actions.ScIncGpc1{
 					ID:       strconv.FormatInt(t.ScID, 10),
+					Cond:     t.Cond,
+					CondTest: t.CondTest,
+				},
+			}, nil
+		case models.TCPResponseRuleActionScDashSetDashGpt:
+			if len(t.Expr) > 0 && t.ScInt != nil {
+				return nil, NewConfError(ErrValidationError, "sc-set-gpt: int and expr are exclusive")
+			}
+			if len(t.Expr) == 0 && t.ScInt == nil {
+				return nil, NewConfError(ErrValidationError, "sc-set-gpt: int or expr has to be set")
+			}
+			return &tcp_types.Content{
+				Action: &actions.ScSetGpt{
+					ScID:     strconv.FormatInt(t.ScID, 10),
+					Idx:      t.ScIdx,
+					Int:      t.ScInt,
+					Expr:     common.Expression{Expr: strings.Split(t.Expr, " ")},
 					Cond:     t.Cond,
 					CondTest: t.CondTest,
 				},
@@ -513,6 +571,27 @@ func SerializeTCPResponseRule(t models.TCPResponseRule) (types.TCPType, error) {
 		case models.TCPResponseRuleActionSilentDashDrop:
 			return &tcp_types.Content{
 				Action: &actions.SilentDrop{
+					RstTTL:   t.RstTTL,
+					Cond:     t.Cond,
+					CondTest: t.CondTest,
+				},
+			}, nil
+		case models.TCPRequestRuleActionSetDashVarDashFmt:
+			return &tcp_types.Content{
+				Action: &actions.SetVarFmt{
+					Fmt:      common.Expression{Expr: strings.Split(t.VarFormat, " ")},
+					VarName:  t.VarName,
+					VarScope: t.VarScope,
+					Cond:     t.Cond,
+					CondTest: t.CondTest,
+				},
+			}, nil
+		case models.TCPRequestRuleActionSetDashVar:
+			return &tcp_types.Content{
+				Action: &actions.SetVar{
+					VarName:  t.VarName,
+					VarScope: t.VarScope,
+					Expr:     common.Expression{Expr: strings.Split(t.Expr, " ")},
 					Cond:     t.Cond,
 					CondTest: t.CondTest,
 				},

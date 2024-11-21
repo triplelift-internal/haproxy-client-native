@@ -60,8 +60,8 @@ type Defaults struct {
 	AcceptInvalidHTTPResponse string `json:"accept_invalid_http_response,omitempty"`
 
 	// adv check
-	// Enum: [ssl-hello-chk smtpchk ldap-check mysql-check pgsql-check tcp-check redis-check httpchk]
-	// +kubebuilder:validation:Enum=ssl-hello-chk;smtpchk;ldap-check;mysql-check;pgsql-check;tcp-check;redis-check;httpchk;
+	// Enum: [httpchk ldap-check mysql-check pgsql-check redis-check smtpchk ssl-hello-chk tcp-check]
+	// +kubebuilder:validation:Enum=httpchk;ldap-check;mysql-check;pgsql-check;redis-check;smtpchk;ssl-hello-chk;tcp-check;
 	AdvCheck string `json:"adv_check,omitempty"`
 
 	// allbackups
@@ -206,6 +206,9 @@ type Defaults struct {
 	// Enum: [enabled disabled]
 	// +kubebuilder:validation:Enum=enabled;disabled;
 	H1CaseAdjustBogusServer string `json:"h1_case_adjust_bogus_server,omitempty"`
+
+	// hash balance factor
+	HashBalanceFactor *int64 `json:"hash_balance_factor,omitempty"`
 
 	// hash type
 	HashType *HashType `json:"hash_type,omitempty"`
@@ -946,7 +949,7 @@ var defaultsTypeAdvCheckPropEnum []interface{}
 
 func init() {
 	var res []string
-	if err := json.Unmarshal([]byte(`["ssl-hello-chk","smtpchk","ldap-check","mysql-check","pgsql-check","tcp-check","redis-check","httpchk"]`), &res); err != nil {
+	if err := json.Unmarshal([]byte(`["httpchk","ldap-check","mysql-check","pgsql-check","redis-check","smtpchk","ssl-hello-chk","tcp-check"]`), &res); err != nil {
 		panic(err)
 	}
 	for _, v := range res {
@@ -956,11 +959,8 @@ func init() {
 
 const (
 
-	// DefaultsAdvCheckSslDashHelloDashChk captures enum value "ssl-hello-chk"
-	DefaultsAdvCheckSslDashHelloDashChk string = "ssl-hello-chk"
-
-	// DefaultsAdvCheckSmtpchk captures enum value "smtpchk"
-	DefaultsAdvCheckSmtpchk string = "smtpchk"
+	// DefaultsAdvCheckHttpchk captures enum value "httpchk"
+	DefaultsAdvCheckHttpchk string = "httpchk"
 
 	// DefaultsAdvCheckLdapDashCheck captures enum value "ldap-check"
 	DefaultsAdvCheckLdapDashCheck string = "ldap-check"
@@ -971,14 +971,17 @@ const (
 	// DefaultsAdvCheckPgsqlDashCheck captures enum value "pgsql-check"
 	DefaultsAdvCheckPgsqlDashCheck string = "pgsql-check"
 
-	// DefaultsAdvCheckTCPDashCheck captures enum value "tcp-check"
-	DefaultsAdvCheckTCPDashCheck string = "tcp-check"
-
 	// DefaultsAdvCheckRedisDashCheck captures enum value "redis-check"
 	DefaultsAdvCheckRedisDashCheck string = "redis-check"
 
-	// DefaultsAdvCheckHttpchk captures enum value "httpchk"
-	DefaultsAdvCheckHttpchk string = "httpchk"
+	// DefaultsAdvCheckSmtpchk captures enum value "smtpchk"
+	DefaultsAdvCheckSmtpchk string = "smtpchk"
+
+	// DefaultsAdvCheckSslDashHelloDashChk captures enum value "ssl-hello-chk"
+	DefaultsAdvCheckSslDashHelloDashChk string = "ssl-hello-chk"
+
+	// DefaultsAdvCheckTCPDashCheck captures enum value "tcp-check"
+	DefaultsAdvCheckTCPDashCheck string = "tcp-check"
 )
 
 // prop value enum

@@ -17,6 +17,9 @@ defaults:
       $ref: "#/definitions/balance"
     hash_type:
       $ref: "#/definitions/hash_type"
+    hash_balance_factor:
+      type: integer
+      x-nullable: true
     persist_rule:
       $ref: "#/definitions/persist_rule"
     maxconn:
@@ -30,7 +33,15 @@ defaults:
     adv_check:
       type: string
       x-display-name: Advanced Check
-      enum: [ssl-hello-chk, smtpchk, ldap-check, mysql-check, pgsql-check, tcp-check, redis-check, httpchk]
+      enum:
+        - httpchk
+        - ldap-check
+        - mysql-check
+        - pgsql-check
+        - redis-check
+        - smtpchk
+        - ssl-hello-chk
+        - tcp-check
     smtpchk_params:
       $ref: "#/definitions/smtpchk_params"
       x-dependency:
@@ -210,9 +221,6 @@ defaults:
     unique_id_header:
       type: string
       x-display-name: Unique ID header
-      x-dependency:
-        unique_id_format:
-          required: true
     logasap:
       type: string
       enum: [enabled, disabled]
