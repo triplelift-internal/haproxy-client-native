@@ -136,6 +136,14 @@ type Raw interface {
 	ExecuteRaw(command string) ([]string, error)
 }
 
+type Cert interface {
+	NewCertEntry(filename string) error
+	SetCertEntry(filename, payload string) error
+	CommitCertEntry(filename string) error
+	AbortCertEntry(filename string) error
+	AddCrtListEntry(crtList string, entry CrtListEntry) error
+}
+
 type Runtime interface {
 	Info
 	Frontend
@@ -145,9 +153,10 @@ type Runtime interface {
 	ACLs
 	Tables
 	Raw
+	Cert
 }
 
-func New(ctx context.Context, opt ...options.RuntimeOption) (Runtime, error) {
+func New(_ context.Context, opt ...options.RuntimeOption) (Runtime, error) {
 	c := &client{
 		options: options.RuntimeOptions{},
 	}
@@ -161,9 +170,9 @@ func New(ctx context.Context, opt ...options.RuntimeOption) (Runtime, error) {
 	}
 
 	if c.options.MasterSocketData != nil {
-		err = c.initWithMasterSocket(ctx, c.options.MasterSocketData.MasterSocketPath, c.options.MasterSocketData.Nbproc)
+		err = c.initWithMasterSocket(c.options)
 	} else {
-		err = c.initWithSockets(ctx, c.options.Sockets)
+		err = c.initWithSockets(c.options)
 	}
 	if err != nil {
 		return nil, err

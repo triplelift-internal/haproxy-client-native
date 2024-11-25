@@ -86,6 +86,7 @@ func TestTCPRequestRuleEqualFalse(t *testing.T) {
 		result.CaptureLen = sample.CaptureLen + 1
 		result.Index = Ptr(*sample.Index + 1)
 		result.NiceValue = sample.NiceValue + 1
+		result.RstTTL = sample.RstTTL + 1
 		result.ScInt = Ptr(*sample.ScInt + 1)
 		result.Timeout = Ptr(*sample.Timeout + 1)
 		result.TrackStickCounter = Ptr(*sample.TrackStickCounter + 1)
@@ -171,6 +172,7 @@ func TestTCPRequestRuleDiffFalse(t *testing.T) {
 		result.CaptureLen = sample.CaptureLen + 1
 		result.Index = Ptr(*sample.Index + 1)
 		result.NiceValue = sample.NiceValue + 1
+		result.RstTTL = sample.RstTTL + 1
 		result.ScInt = Ptr(*sample.ScInt + 1)
 		result.Timeout = Ptr(*sample.Timeout + 1)
 		result.TrackStickCounter = Ptr(*sample.TrackStickCounter + 1)

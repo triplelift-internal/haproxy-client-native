@@ -47,6 +47,17 @@ type HTTPAfterResponseRule struct {
 	// +kubebuilder:validation:Pattern=`^[^\s]+$`
 	ACLKeyfmt string `json:"acl_keyfmt,omitempty"`
 
+	// capture id
+	CaptureID *int64 `json:"capture_id,omitempty"`
+
+	// capture len
+	CaptureLen int64 `json:"capture_len,omitempty"`
+
+	// capture sample
+	// Pattern: ^(?:[A-Za-z]+\("([A-Za-z\s]+)"\)|[A-Za-z]+)
+	// +kubebuilder:validation:Pattern=`^(?:[A-Za-z]+\("([A-Za-z\s]+)"\)|[A-Za-z]+)`
+	CaptureSample string `json:"capture_sample,omitempty"`
+
 	// cond
 	// Enum: [if unless]
 	// +kubebuilder:validation:Enum=if;unless;
@@ -69,6 +80,7 @@ type HTTPAfterResponseRule struct {
 
 	// index
 	// Required: true
+	// +kubebuilder:validation:Optional
 	Index *int64 `json:"index"`
 
 	// log level
@@ -120,12 +132,15 @@ type HTTPAfterResponseRule struct {
 
 	// type
 	// Required: true
-	// Enum: [add-header allow del-acl del-header del-map replace-header replace-value sc-add-gpc sc-inc-gpc sc-inc-gpc0 sc-inc-gpc1 sc-set-gpt0 set-header set-log-level set-map set-status set-var strict-mode unset-var]
-	// +kubebuilder:validation:Enum=add-header;allow;del-acl;del-header;del-map;replace-header;replace-value;sc-add-gpc;sc-inc-gpc;sc-inc-gpc0;sc-inc-gpc1;sc-set-gpt0;set-header;set-log-level;set-map;set-status;set-var;strict-mode;unset-var;
+	// Enum: [add-header allow capture del-acl del-header del-map replace-header replace-value sc-add-gpc sc-inc-gpc sc-inc-gpc0 sc-inc-gpc1 sc-set-gpt sc-set-gpt0 set-header set-log-level set-map set-status set-var set-var-fmt strict-mode unset-var]
+	// +kubebuilder:validation:Enum=add-header;allow;capture;del-acl;del-header;del-map;replace-header;replace-value;sc-add-gpc;sc-inc-gpc;sc-inc-gpc0;sc-inc-gpc1;sc-set-gpt;sc-set-gpt0;set-header;set-log-level;set-map;set-status;set-var;set-var-fmt;strict-mode;unset-var;
 	Type string `json:"type"`
 
 	// var expr
 	VarExpr string `json:"var_expr,omitempty"`
+
+	// var format
+	VarFormat string `json:"var_format,omitempty"`
 
 	// var name
 	// Pattern: ^[^\s]+$
@@ -147,6 +162,10 @@ func (m *HTTPAfterResponseRule) Validate(formats strfmt.Registry) error {
 	}
 
 	if err := m.validateACLKeyfmt(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateCaptureSample(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -218,6 +237,18 @@ func (m *HTTPAfterResponseRule) validateACLKeyfmt(formats strfmt.Registry) error
 	}
 
 	if err := validate.Pattern("acl_keyfmt", "body", m.ACLKeyfmt, `^[^\s]+$`); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *HTTPAfterResponseRule) validateCaptureSample(formats strfmt.Registry) error {
+	if swag.IsZero(m.CaptureSample) { // not required
+		return nil
+	}
+
+	if err := validate.Pattern("capture_sample", "body", m.CaptureSample, `^(?:[A-Za-z]+\("([A-Za-z\s]+)"\)|[A-Za-z]+)`); err != nil {
 		return err
 	}
 
@@ -436,7 +467,7 @@ var httpAfterResponseRuleTypeTypePropEnum []interface{}
 
 func init() {
 	var res []string
-	if err := json.Unmarshal([]byte(`["add-header","allow","del-acl","del-header","del-map","replace-header","replace-value","sc-add-gpc","sc-inc-gpc","sc-inc-gpc0","sc-inc-gpc1","sc-set-gpt0","set-header","set-log-level","set-map","set-status","set-var","strict-mode","unset-var"]`), &res); err != nil {
+	if err := json.Unmarshal([]byte(`["add-header","allow","capture","del-acl","del-header","del-map","replace-header","replace-value","sc-add-gpc","sc-inc-gpc","sc-inc-gpc0","sc-inc-gpc1","sc-set-gpt","sc-set-gpt0","set-header","set-log-level","set-map","set-status","set-var","set-var-fmt","strict-mode","unset-var"]`), &res); err != nil {
 		panic(err)
 	}
 	for _, v := range res {
@@ -451,6 +482,9 @@ const (
 
 	// HTTPAfterResponseRuleTypeAllow captures enum value "allow"
 	HTTPAfterResponseRuleTypeAllow string = "allow"
+
+	// HTTPAfterResponseRuleTypeCapture captures enum value "capture"
+	HTTPAfterResponseRuleTypeCapture string = "capture"
 
 	// HTTPAfterResponseRuleTypeDelDashACL captures enum value "del-acl"
 	HTTPAfterResponseRuleTypeDelDashACL string = "del-acl"
@@ -479,6 +513,9 @@ const (
 	// HTTPAfterResponseRuleTypeScDashIncDashGpc1 captures enum value "sc-inc-gpc1"
 	HTTPAfterResponseRuleTypeScDashIncDashGpc1 string = "sc-inc-gpc1"
 
+	// HTTPAfterResponseRuleTypeScDashSetDashGpt captures enum value "sc-set-gpt"
+	HTTPAfterResponseRuleTypeScDashSetDashGpt string = "sc-set-gpt"
+
 	// HTTPAfterResponseRuleTypeScDashSetDashGpt0 captures enum value "sc-set-gpt0"
 	HTTPAfterResponseRuleTypeScDashSetDashGpt0 string = "sc-set-gpt0"
 
@@ -496,6 +533,9 @@ const (
 
 	// HTTPAfterResponseRuleTypeSetDashVar captures enum value "set-var"
 	HTTPAfterResponseRuleTypeSetDashVar string = "set-var"
+
+	// HTTPAfterResponseRuleTypeSetDashVarDashFmt captures enum value "set-var-fmt"
+	HTTPAfterResponseRuleTypeSetDashVarDashFmt string = "set-var-fmt"
 
 	// HTTPAfterResponseRuleTypeStrictDashMode captures enum value "strict-mode"
 	HTTPAfterResponseRuleTypeStrictDashMode string = "strict-mode"

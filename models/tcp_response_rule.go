@@ -38,8 +38,8 @@ import (
 // swagger:model tcp_response_rule
 type TCPResponseRule struct {
 	// action
-	// Enum: [accept reject lua set-bandwidth-limit close sc-add-gpc sc-inc-gpc sc-inc-gpc0 sc-inc-gpc1 sc-set-gpt0 send-spoe-group set-log-level set-mark set-nice set-tos silent-drop unset-var]
-	// +kubebuilder:validation:Enum=accept;reject;lua;set-bandwidth-limit;close;sc-add-gpc;sc-inc-gpc;sc-inc-gpc0;sc-inc-gpc1;sc-set-gpt0;send-spoe-group;set-log-level;set-mark;set-nice;set-tos;silent-drop;unset-var;
+	// Enum: [accept close lua reject sc-add-gpc sc-inc-gpc sc-inc-gpc0 sc-inc-gpc1 sc-set-gpt sc-set-gpt0 send-spoe-group set-bandwidth-limit set-log-level set-mark set-nice set-tos set-var set-var-fmt silent-drop unset-var]
+	// +kubebuilder:validation:Enum=accept;close;lua;reject;sc-add-gpc;sc-inc-gpc;sc-inc-gpc0;sc-inc-gpc1;sc-set-gpt;sc-set-gpt0;send-spoe-group;set-bandwidth-limit;set-log-level;set-mark;set-nice;set-tos;set-var;set-var-fmt;silent-drop;unset-var;
 	Action string `json:"action,omitempty"`
 
 	// bandwidth limit limit
@@ -64,6 +64,7 @@ type TCPResponseRule struct {
 
 	// index
 	// Required: true
+	// +kubebuilder:validation:Optional
 	Index *int64 `json:"index"`
 
 	// log level
@@ -90,6 +91,9 @@ type TCPResponseRule struct {
 	// +kubebuilder:validation:Maximum=1024
 	// +kubebuilder:validation:Minimum=-1024
 	NiceValue int64 `json:"nice_value,omitempty"`
+
+	// rst ttl
+	RstTTL int64 `json:"rst_ttl,omitempty"`
 
 	// sc expr
 	ScExpr string `json:"sc_expr,omitempty"`
@@ -126,6 +130,9 @@ type TCPResponseRule struct {
 	// Enum: [content inspect-delay]
 	// +kubebuilder:validation:Enum=content;inspect-delay;
 	Type string `json:"type"`
+
+	// var format
+	VarFormat string `json:"var_format,omitempty"`
 
 	// var name
 	// Pattern: ^[^\s]+$
@@ -204,7 +211,7 @@ var tcpResponseRuleTypeActionPropEnum []interface{}
 
 func init() {
 	var res []string
-	if err := json.Unmarshal([]byte(`["accept","reject","lua","set-bandwidth-limit","close","sc-add-gpc","sc-inc-gpc","sc-inc-gpc0","sc-inc-gpc1","sc-set-gpt0","send-spoe-group","set-log-level","set-mark","set-nice","set-tos","silent-drop","unset-var"]`), &res); err != nil {
+	if err := json.Unmarshal([]byte(`["accept","close","lua","reject","sc-add-gpc","sc-inc-gpc","sc-inc-gpc0","sc-inc-gpc1","sc-set-gpt","sc-set-gpt0","send-spoe-group","set-bandwidth-limit","set-log-level","set-mark","set-nice","set-tos","set-var","set-var-fmt","silent-drop","unset-var"]`), &res); err != nil {
 		panic(err)
 	}
 	for _, v := range res {
@@ -217,17 +224,14 @@ const (
 	// TCPResponseRuleActionAccept captures enum value "accept"
 	TCPResponseRuleActionAccept string = "accept"
 
-	// TCPResponseRuleActionReject captures enum value "reject"
-	TCPResponseRuleActionReject string = "reject"
+	// TCPResponseRuleActionClose captures enum value "close"
+	TCPResponseRuleActionClose string = "close"
 
 	// TCPResponseRuleActionLua captures enum value "lua"
 	TCPResponseRuleActionLua string = "lua"
 
-	// TCPResponseRuleActionSetDashBandwidthDashLimit captures enum value "set-bandwidth-limit"
-	TCPResponseRuleActionSetDashBandwidthDashLimit string = "set-bandwidth-limit"
-
-	// TCPResponseRuleActionClose captures enum value "close"
-	TCPResponseRuleActionClose string = "close"
+	// TCPResponseRuleActionReject captures enum value "reject"
+	TCPResponseRuleActionReject string = "reject"
 
 	// TCPResponseRuleActionScDashAddDashGpc captures enum value "sc-add-gpc"
 	TCPResponseRuleActionScDashAddDashGpc string = "sc-add-gpc"
@@ -241,11 +245,17 @@ const (
 	// TCPResponseRuleActionScDashIncDashGpc1 captures enum value "sc-inc-gpc1"
 	TCPResponseRuleActionScDashIncDashGpc1 string = "sc-inc-gpc1"
 
+	// TCPResponseRuleActionScDashSetDashGpt captures enum value "sc-set-gpt"
+	TCPResponseRuleActionScDashSetDashGpt string = "sc-set-gpt"
+
 	// TCPResponseRuleActionScDashSetDashGpt0 captures enum value "sc-set-gpt0"
 	TCPResponseRuleActionScDashSetDashGpt0 string = "sc-set-gpt0"
 
 	// TCPResponseRuleActionSendDashSpoeDashGroup captures enum value "send-spoe-group"
 	TCPResponseRuleActionSendDashSpoeDashGroup string = "send-spoe-group"
+
+	// TCPResponseRuleActionSetDashBandwidthDashLimit captures enum value "set-bandwidth-limit"
+	TCPResponseRuleActionSetDashBandwidthDashLimit string = "set-bandwidth-limit"
 
 	// TCPResponseRuleActionSetDashLogDashLevel captures enum value "set-log-level"
 	TCPResponseRuleActionSetDashLogDashLevel string = "set-log-level"
@@ -258,6 +268,12 @@ const (
 
 	// TCPResponseRuleActionSetDashTos captures enum value "set-tos"
 	TCPResponseRuleActionSetDashTos string = "set-tos"
+
+	// TCPResponseRuleActionSetDashVar captures enum value "set-var"
+	TCPResponseRuleActionSetDashVar string = "set-var"
+
+	// TCPResponseRuleActionSetDashVarDashFmt captures enum value "set-var-fmt"
+	TCPResponseRuleActionSetDashVarDashFmt string = "set-var-fmt"
 
 	// TCPResponseRuleActionSilentDashDrop captures enum value "silent-drop"
 	TCPResponseRuleActionSilentDashDrop string = "silent-drop"
