@@ -1,0 +1,20 @@
+name: "Sync Github Advanced Security Alerts to Jira"
+
+on:
+  schedule:
+    - cron: '0 */12 * * *'    # trigger synchronization every 12 hours
+
+jobs:
+  ghas_alerts_to_jira:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync alerts to Jira issues
+        uses: triplelift-internal/ghas-jira-integration@v1.2.4-tl
+        with:
+          jira_url: '${{ secrets.JIRA_HOST }}'
+          jira_user: '${{ secrets.JIRA_USER }}'
+          jira_token: '${{ secrets.JIRA_TOKEN }}'
+          jira_project: 'TLCE'
+          jira_labels: 'infra,security,Operations'
+          github_token: '${{ secrets.GH_ORG_TOKEN }}'
+          sync_direction: 'gh2jira'
