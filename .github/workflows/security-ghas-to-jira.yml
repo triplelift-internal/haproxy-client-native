@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Sync alerts to Jira issues
-        uses: triplelift-internal/ghas-jira-integration@v1.2.4-tl
+        uses: triplelift-internal/ghas-jira-integration@673978099431442987e169a5c34ff0e4ca94613e # v1.3.0
         with:
           jira_url: '${{ secrets.JIRA_HOST }}'
           jira_user: '${{ secrets.JIRA_USER }}'
